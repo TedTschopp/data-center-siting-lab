@@ -71,6 +71,7 @@ for that derived workflow.
 |                  Bounded feasible-land approximation | `python -m reVeal.public_data run-public-report-bundle --output-dir external-data/derived/report-bundle`                                                                                                     | `tests/data/downscale/inputs/grid_char_weighted_scores.gpkg`; `developable_capacity_mw > 0`; staged NLCD water/wetland share across classes `11`, `90`, and `95` flags cells at or above `0.5` without removing them | `external-data/derived/report-bundle/public_report_feasible_land.gpkg`                        | focused pytest coverage plus `run-public-report-bundle`                             |
 |         Bounded suitability-percentile approximation | `python -m reVeal.public_data run-public-report-bundle --output-dir external-data/derived/report-bundle`                                                                                                     | `tests/data/downscale/inputs/grid_char_weighted_scores.gpkg`; percentile rank of `suitability_score` on developable cells; water/wetland-flagged cells are clamped to `0`; Census coordinate GeoLookup identity enrichment when enabled, with deterministic bounded catalog fallback | `external-data/derived/report-bundle/public_report_suitability_percentiles.gpkg`              | focused pytest coverage plus `run-public-report-bundle`                             |
 |        Bounded nationwide ranked suitability summary | `python -m reVeal.public_data run-public-report-bundle --output-dir external-data/derived/report-bundle`                                                                                                     | derived from `public_report_suitability_percentiles.gpkg`, including numeric cell id, deterministic `cell_name`, `base_cell_name`, disambiguation flag, Census geography fields, anchor-place metadata, candidate names, and selection basis | `external-data/derived/report-bundle/public_report_suitability_ranked_cells.csv`              | focused pytest coverage plus `run-public-report-bundle`                             |
+|                 Census GeoLookup miss review outputs | `python -m reVeal.public_data run-public-report-bundle --output-dir external-data/derived/report-bundle`                                                                                                     | retained ranked cells whose Census coordinate GeoLookup status is missing or error; nearest-state boundary distance; water/wetland clamp status; map-impact class; dedicated fallback display-label decision                         | `external-data/derived/report-bundle/public_report_census_geolookup_misses.csv`; `external-data/derived/report-bundle/public_report_census_geolookup_misses.md` | focused pytest coverage plus `run-public-report-bundle`                             |
 |                 Derived state-boundary context layer | `python -m reVeal.public_data run-public-report-bundle --output-dir external-data/derived/report-bundle`                                                                                                     | official Census generalized state boundaries from `https://www2.census.gov/geo/tiger/GENZ2024/shp/cb_2024_us_state_20m.zip`, reprojected into the suitability layer CRS                                             | `external-data/derived/report-bundle/public_report_state_boundaries.gpkg`                     | focused pytest coverage plus `run-public-report-bundle`                             |
 |                     Bounded zoning proxy layer | `python -m reVeal.public_data run-public-report-bundle --output-dir external-data/derived/report-bundle`                                                                                                     | staged NLCD land-cover raster sampled onto the execution-grid cells; developed classes are carried forward as a coarse zoning-context proxy rather than parcel zoning                                                   | `external-data/derived/report-bundle/public_report_zoning_proxy.gpkg`                         | focused pytest coverage plus `run-public-report-bundle`                             |
 |       Bounded permitting / ordinance proxy layer | `python -m reVeal.public_data run-public-report-bundle --output-dir external-data/derived/report-bundle`                                                                                                     | staged `external-data/manifest/permitting-ordinance-evidence.csv` rows with public evidence points assigned to execution-grid cells; classes are evidence signals, not permit-readiness determinations                  | `external-data/derived/report-bundle/public_report_permitting_proxy.gpkg`                      | focused pytest coverage plus `run-public-report-bundle`                             |
@@ -106,7 +107,8 @@ The fallback rule is intentionally self-contained and offline so the bundle rema
 6. The general American label remains an identity-stack field that chooses the smallest broadly recognizable official layer: Census place when present, Census metro area when present, otherwise Census division, state, or fallback catalog/state labels.
 7. The report-facing display label is separate from the join label. `display_cell_name` prefers the most specific useful official geography with state context, such as `Scotch Plains township, New Jersey`; generic districts such as `District 3` also include county context. `display_context_name` carries the broader recognition layer, such as metro, combined statistical area, or urban area, when that helps the audience interpret the local label.
 8. The legacy `cell_name` remains a stable unique row label for CSV joins and disambiguation. Census-backed names use the official intersecting geography as the base label; duplicate row labels are expanded with available county/state context and coordinates only when needed.
-9. The D3 map table uses `display_cell_name` as the primary visible label and shows `display_context_name` as secondary context when it adds information. Naming basis, match type, Census fields, and identity-stack metadata remain available as CSV/GeoPackage fields and in the cell tooltip rather than appearing as visible suffixes such as `metro name` or `natural name`.
+9. Census GeoLookup misses are not treated as authoritative Census identities. The bundle writes `public_report_census_geolookup_misses.csv` and `public_report_census_geolookup_misses.md` to classify retained missing rows by location class, nearest-state fallback, water/wetland clamp status, and map-impact class. Retained misses outside state boundaries get a dedicated boundary/coastal display label rather than presenting the bounded catalog fallback as if Census had named the cell.
+10. The D3 map table uses `display_cell_name` as the primary visible label and shows `display_context_name` as secondary context when it adds information. Naming basis, match type, Census fields, and identity-stack metadata remain available as CSV/GeoPackage fields and in the cell tooltip rather than appearing as visible suffixes such as `metro name` or `natural name`.
 
 That rule is reproducible and based on public Census geography when online lookup is enabled, but it is still a bounded public approximation rather than a report-sourced naming layer.
 
@@ -251,6 +253,19 @@ The current bounded public bundle is not report-equivalent for these reasons:
 - The current configs use a `baseline_year` of `2022`, while the report narrative
   and LinkedIn Part II description frame the scenario around operating data centers
   in `2025`.
+- The assumption registry and ReEDS contract now encode the report-parity temporal
+  contract explicitly: report reference starting stock is 2025 operating data
+  centers, modeled years are 2025, 2030, 2035, 2040, 2045, and 2050, and the
+  cumulative-buildout horizon is 25 years through 2050. The current bounded bundle
+  records its configured 2022 starting-stock field and current modeled-year set as
+  a parity blocker rather than changing buildout behavior without validating the
+  2025 source.
+- The current smoke configs now encode the report-style capacity constraint as a
+  bounded assumption: `utilization_factor` is `0.88`, and
+  `max_site_addition_per_time_step` is `1000` MW of nameplate capacity. Allocation
+  converts those values into load-equivalent limits before distributing projected
+  demand, remains capacity-limited when projected demand exceeds capped available
+  capacity, and writes capacity-equivalent cumulative buildout fields for review.
 - The current grid priority field is a pre-existing `suitability_score`, not a
   reproduced Baxtel-trained random-forest output from the report methodology.
 - The current feasible-land output is a bounded approximation that keeps cells where
@@ -272,6 +287,9 @@ The current bounded public bundle is not report-equivalent for these reasons:
   proxy, not a reproduced local transmission hosting-capacity surface.
 - The current assumption registry makes those bounded choices explicit, but it does
   not turn them into report-equivalent methodology.
+- The current assumption registry and ReEDS contract validate the explicit 88%
+  utilization and 1 GW per-cell time-step capacity cap, but those settings remain
+  bounded assumptions rather than recovered report source data.
 - The current limitations note carries forward named refinement gaps, but those
   limitations remain active constraints on how the bundle should be interpreted.
 - The current ReEDS integration contract validates bounded handoff structure and
@@ -288,7 +306,8 @@ bundle:
 - report-equivalent suitability percentile map derived from the trained nationwide model
 - report-equivalent scored and ranked nationwide siting surface from the report methodology
 - report-equivalent cumulative buildout animation starting from a reproduced 2025
-  operating baseline and a report-equivalent suitability surface
+  operating baseline, report-equivalent suitability surface, and fully recovered
+  capacity-constrained allocation semantics
 
 ## Bottom Line
 

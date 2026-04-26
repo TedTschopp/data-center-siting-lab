@@ -65,17 +65,15 @@ public-source approximation.
 Keep this section aligned with the open checklist below. When priorities or
 dependencies change, update this order in the same change.
 
-Current recommended next action: classify unresolved Census GeoLookup misses for
-retained cells, then return to true report-parity blockers now that the bounded
-report map and ranked table have cleaner stakeholder-facing labels.
+Current recommended next action: evaluate and implement the report-equivalent
+national grid-resolution contract now that utilization and per-site capacity
+constraints are explicitly encoded and validated.
 
 Immediate follow-up order:
 
-1. Classify unresolved Census GeoLookup misses for coastal, offshore, or otherwise
-      unmatched retained cells, and improve fallback display names where needed.
-2. Pursue true report-parity blockers, including baseline-year assumptions,
-      utilization handling, grid resolution, exact downscaling rules, and Baxtel
-      suitability-surface parity.
+1. Evaluate and implement report-equivalent national grid resolution.
+2. Pursue the remaining report-parity blockers: exact downscaling
+      rules, and Baxtel suitability-surface parity.
 
 ## Priority 1: Core Blockers
 
@@ -702,7 +700,7 @@ Immediate follow-up order:
       variables for map background, panels, controls, table rows, state outlines,
       active highlights, and tooltips across light and dark themes.
 
-- [ ] 40. Define the report-parity baseline year and buildout horizon assumptions.
+- [x] 40. Define the report-parity baseline year and buildout horizon assumptions.
       Evidence: the bounded public bundle can emit cumulative buildout products, but
       the report-parity baseline and time horizon are still recorded as deviations
       rather than implemented assumptions.
@@ -710,14 +708,31 @@ Immediate follow-up order:
       existing-data-center starting stock, and cumulative-buildout horizon; encode
       those assumptions in tracked config or metadata; and update the bounded bundle
       only when the assumptions can be validated against report requirements.
+      Outcome: completed. The assumption registry and ReEDS contract now carry a
+      temporal-assumption contract: the report reference starts from 2025 operating
+      data centers, uses modeled years 2025, 2030, 2035, 2040, 2045, and 2050, and
+      defines a 25-year cumulative-buildout horizon through 2050. The current bounded
+      bundle keeps its configured 2022 `dc_capacity_mw_existing` starting-stock field;
+      the regenerated summary currently carries modeled years 2022, 2024, 2030, 2035,
+      2040, 2045, and 2050, which is a 28-year current-bundle span. The registry records
+      that mismatch as a parity blocker rather than silently changing buildout behavior
+      before the 2025 starting-stock source is validated.
 
-- [ ] 41. Implement report-parity utilization and per-site capacity constraints.
+- [x] 41. Implement report-parity utilization and per-site capacity constraints.
       Evidence: the report references an 88% utilization factor and a maximum 1 GW per
       site per time-step, while the bounded public bundle currently documents these as
       parity gaps.
       Required outcome: implement configurable utilization and per-site/time-step
       capacity constraints in the report-output workflow, add validation coverage, and
       keep the limitation explicit if exact report semantics cannot be recovered.
+      Outcome: completed. Downscale configs now accept `utilization_factor` and
+      `max_site_addition_per_time_step`; the load allocation path converts baseline,
+      developable, and per-step capacity limits into load-equivalent values before
+      distributing projected demand. The public smoke configs use 0.88 utilization
+      and a 1000 MW per-site time-step capacity cap, cumulative buildout artifacts
+      emit capacity-equivalent fields and cap-exceeded flags, and the assumption
+      registry plus ReEDS contract validate those settings while keeping unrecovered
+      report semantics explicit.
 
 - [ ] 42. Evaluate and implement report-equivalent national grid resolution.
       Evidence: the report references a 5.76 km grid and LinkedIn text references a
@@ -765,7 +780,7 @@ Immediate follow-up order:
       match scope, and stack metadata remain in output fields and the cell tooltip
       rather than visible suffixes like `metro name` or `natural name`.
 
-- [ ] 46. Classify unresolved Census GeoLookup misses in retained report cells.
+- [x] 46. Classify unresolved Census GeoLookup misses in retained report cells.
       Evidence: the regenerated bounded report bundle matched 3,758 of 3,911 retained
       cells through Census coordinate GeoLookup, leaving 153 retained cells with
       missing Census identity fields. These are likely coastal, offshore, or
@@ -776,6 +791,30 @@ Immediate follow-up order:
       current bounded-catalog fallback is sufficient or whether coastal/offshore
       display naming needs a dedicated rule; document the decision and regression-test
       any naming change.
+      Outcome: completed. The report bundle now writes
+      `public_report_census_geolookup_misses.csv` and
+      `public_report_census_geolookup_misses.md`, classifying retained Census misses
+      by location class, nearest-state fallback, water/wetland clamp status, and
+      map-impact class. The first regenerated review found that 152 of 153 misses
+      were outside state-boundary polygons but within 25 miles of the nearest state,
+      while 1 miss was inside a state boundary without a named Census response; 25
+      were water/wetland-clamped cells, and 6 were high-impact retained rows above
+      the 90th suitability percentile. The
+      bounded catalog fallback is no longer treated as authoritative identity for
+      those rows: outside-boundary misses receive a dedicated boundary/coastal display
+      label, and the change is regression-tested in `tests/test_public_data.py`.
+
+- [ ] 47. Add a buildout timeline mode to the generated HTML report.
+      Evidence: the bounded bundle already writes year-by-year cumulative buildout
+      artifacts (`public_eer_total_downscaled_cumulative_buildout.gpkg`,
+      `public_eer_regional_downscaled_cumulative_buildout.gpkg`, and
+      `public_report_bundle_cumulative_buildout_summary.csv`), but the current HTML
+      report only displays the static suitability/proxy surface and top-ranked cells.
+      Required outcome: add a report UI mode that lets reviewers inspect cumulative
+      buildout by year, including a year selector or timeline control, total vs.
+      regional source selection when useful, map styling for cumulative load or new
+      load, selected-year summary totals, and tooltip/table fields that explain the
+      selected year without implying report-equivalent temporal parity.
 
 ## Ongoing Rule
 

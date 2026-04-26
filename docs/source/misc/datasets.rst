@@ -244,7 +244,14 @@ normalized ``census_*`` geography fields so the map can choose the useful layer 
 its audience. Census-backed labels use official place, county subdivision, county,
 metro area, state, Census division, and Census region names when available. Naming
 basis fields remain in the data outputs and map tooltip rather than being appended
-to the visible table label.
+to the visible table label. The bundle also writes
+``public_report_census_geolookup_misses.csv`` and
+``public_report_census_geolookup_misses.md``. Those generated review artifacts
+classify retained cells where Census did not return named geography by nearest
+state fallback, boundary/coastal location class, water/wetland clamp status, and
+map-impact class. Missing Census rows outside state boundaries receive dedicated
+boundary/coastal display labels instead of presenting the bounded catalog fallback
+as authoritative Census identity.
 
 The D3 suitability map HTML page uses a single self-contained browser document to
 render the bounded feasible-land and suitability surfaces directly from embedded
@@ -258,7 +265,18 @@ overlays without replacing the base suitability surface.
 The assumption registry JSON is derived from the tracked total and regional smoke
 configs plus the bounded bundle rules. It records scenario inputs,
 report-reference assumptions, current bounded assumptions, output labels, and
-explicit assumption gaps.
+explicit assumption gaps. It now includes a temporal-assumption contract that
+separates the report reference from current bounded behavior: the report reference
+starts from 2025 operating data centers, carries modeled years 2025, 2030, 2035,
+2040, 2045, and 2050, and treats the buildout horizon as 25 years through 2050.
+The current bundle keeps the configured 2022 starting-stock field and records the
+mismatch as a parity blocker rather than changing buildout behavior implicitly.
+It also records the report-style capacity constraint explicitly: the public smoke
+configs use an 0.88 utilization factor and a 1000 MW per-site time-step nameplate
+capacity cap, which the downscale path converts to load-equivalent allocation
+limits. When projected demand exceeds capped available capacity, the output remains
+capacity-limited instead of forcing excess load into a grid cell. The cumulative
+buildout artifacts expose both load and capacity-equivalent fields.
 
 The limitations note carries forward the named LinkedIn refinement gaps directly
 into the generated bundle. It explicitly states that local transmission hosting

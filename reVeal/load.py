@@ -116,7 +116,10 @@ def _simulate_deployment(
 
     cumulative_developable = shuffle_df["_developable_capacity_inc"].cumsum()
     cumulative_exceeds_total = cumulative_developable > load_projected_in_year
-    last_deployed_idx = np.argmax(cumulative_exceeds_total)
+    if cumulative_exceeds_total.any():
+        last_deployed_idx = np.argmax(cumulative_exceeds_total)
+    else:
+        last_deployed_idx = len(shuffle_df) - 1
 
     deployed_df = shuffle_df.iloc[0 : last_deployed_idx + 1]
 
@@ -149,6 +152,8 @@ def downscale_total(
     load_value_col,
     load_year_col,
     max_site_addition_per_year=None,
+    max_site_addition_per_time_step=None,
+    utilization_factor=1.0,
     site_saturation_limit=1,
     priority_power=1,
     n_bootstraps=10_000,
@@ -197,6 +202,15 @@ def downscale_total(
         dispersion of load: since there is a limit to the pace at which individual
         sites can build out load, more sites are typically required for the same amount
         of project load.
+    max_site_addition_per_time_step : float, optional
+        Value indicating the maximum allowable capacity that can be added in a single
+        modeled time step to an individual site. When ``utilization_factor`` is less
+        than 1, this capacity limit is converted to a load-equivalent cap before
+        downscaling.
+    utilization_factor : float, optional
+        Load-to-capacity utilization factor. Grid capacity constraints are multiplied
+        by this factor before allocating load projections, so a site with 100 MW of
+        capacity at 88% utilization can accept 88 MW of load. Default is 1.
     site_saturation_limit : float, optional
         Adjustment factor limit the developable capacity of load within each site.
         This value is used to scale the values in the ``grid_capacity_col``. For
@@ -255,12 +269,17 @@ def downscale_total(
     """
 
     grid_df["_weight"] = grid_df[grid_priority_col] ** priority_power
-    grid_df[f"total_{load_value_col}"] = grid_df[grid_baseline_load_col].astype(float)
+    if utilization_factor <= 0 or utilization_factor > 1:
+        raise ValueError("utilization_factor must be greater than 0 and no greater than 1")
+
+    grid_df[f"total_{load_value_col}"] = (
+        grid_df[grid_baseline_load_col].astype(float) * utilization_factor
+    )
     grid_df[f"new_{load_value_col}"] = float(0.0)
     # note: don't decrement off existing load because developable capacity
     # should already account for exclusions from existing buildings
     grid_df["_developable_capacity"] = (
-        grid_df[grid_capacity_col] * site_saturation_limit
+        grid_df[grid_capacity_col] * site_saturation_limit * utilization_factor
     )
     grid_idx = grid_df.index.name
     if grid_idx is None:
@@ -280,10 +299,15 @@ def downscale_total(
             year = group_id[0]
             grid_year_df["year"] = year
             grid_year_df[f"new_{load_value_col}"] = float(0.0)
-            if max_site_addition_per_year:
+            if max_site_addition_per_time_step:
+                grid_year_df["_developable_capacity_inc"] = np.minimum(
+                    max_site_addition_per_time_step * utilization_factor,
+                    grid_year_df["_developable_capacity"],
+                )
+            elif max_site_addition_per_year:
                 years_since_prior = year - prior_year
                 grid_year_df["_developable_capacity_inc"] = np.minimum(
-                    max_site_addition_per_year * years_since_prior,
+                    max_site_addition_per_year * years_since_prior * utilization_factor,
                     grid_year_df["_developable_capacity"],
                 )
             else:
@@ -300,6 +324,15 @@ def downscale_total(
             grid_year_sub_df = grid_year_df[grid_year_df["_weight"] > 0][
                 [grid_idx, "_developable_capacity_inc", "_weight"]
             ]
+            load_to_deploy_in_year = load_projected_in_year
+            if max_site_addition_per_time_step:
+                capped_developable_capacity = grid_year_sub_df[
+                    "_developable_capacity_inc"
+                ].sum()
+                load_to_deploy_in_year = min(
+                    load_projected_in_year,
+                    capped_developable_capacity,
+                )
             with tqdm.tqdm(
                 total=n_bootstraps,
                 desc=f"Running bootstraps for year {year}",
@@ -309,7 +342,7 @@ def downscale_total(
                 for i in range(0, n_bootstraps):
                     future = pool.submit(
                         _simulate_deployment,
-                        load_projected_in_year=load_projected_in_year,
+                        load_projected_in_year=load_to_deploy_in_year,
                         grid_year_df=grid_year_sub_df,
                         grid_idx=grid_idx,
                         grid_weights="_weight",
@@ -332,11 +365,11 @@ def downscale_total(
                 means_df["_new_capacity"] / means_df["_new_capacity"].sum()
             )
             means_df["_new_calibrated_capacity"] = (
-                means_df["_proportion"] * load_projected_in_year
+                means_df["_proportion"] * load_to_deploy_in_year
             )
             total_calibrated_deployed = means_df["_new_calibrated_capacity"].sum()
 
-            if not isclose(total_calibrated_deployed, load_projected_in_year):
+            if not isclose(total_calibrated_deployed, load_to_deploy_in_year):
                 raise ValueError("Deployed total is not equal to projected total")
 
             overbuilt = (
@@ -389,6 +422,8 @@ def downscale_regional(
     load_year_col,
     load_region_col,
     max_site_addition_per_year=None,
+    max_site_addition_per_time_step=None,
+    utilization_factor=1.0,
     site_saturation_limit=1,
     priority_power=1,
     n_bootstraps=10_000,
@@ -443,6 +478,14 @@ def downscale_regional(
         dispersion of load: since there is a limit to the pace at which individual
         sites can build out load, more sites are typically required for the same amount
         of project load.
+    max_site_addition_per_time_step : float, optional
+        Value indicating the maximum allowable capacity that can be added in a single
+        modeled time step to an individual site. When ``utilization_factor`` is less
+        than 1, this capacity limit is converted to a load-equivalent cap before
+        downscaling.
+    utilization_factor : float, optional
+        Load-to-capacity utilization factor used to convert capacity constraints into
+        load-equivalent limits before allocating load projections. Default is 1.
     site_saturation_limit : float, optional
         Adjustment factor limit the developable capacity of load within each site.
         This value is used to scale the values in the ``grid_capacity_col``. For
@@ -532,6 +575,8 @@ def downscale_regional(
             load_value_col=load_value_col,
             load_year_col=load_year_col,
             max_site_addition_per_year=max_site_addition_per_year,
+            max_site_addition_per_time_step=max_site_addition_per_time_step,
+            utilization_factor=utilization_factor,
             site_saturation_limit=site_saturation_limit,
             priority_power=priority_power,
             n_bootstraps=n_bootstraps,

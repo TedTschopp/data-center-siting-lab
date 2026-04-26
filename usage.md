@@ -265,19 +265,33 @@ Behavior:
   `display_context_name` for the report table and map, `local_cell_name` for the
   most specific available place identity, `general_american_cell_name` for
   broader recognition, `identity_stack_json` for the ordered identity layers, and
-  `census_*` columns for the official geography source values.
+  `census_*` columns for the official geography source values. The bundle also
+  writes `public_report_census_geolookup_misses.csv` and
+  `public_report_census_geolookup_misses.md` so retained Census misses can be
+  reviewed by nearest-state fallback, boundary/coastal class, water/wetland clamp
+  status, and map-impact class.
 - The D3 map HTML page embeds the bounded feasible-land and suitability surfaces in a single browser-rendered file so you can inspect the map without opening GIS software. The underlying grid remains the internal model, but the browser display draws grid-backed cells as fitted hexagons for quicker visual scanning. Water/wetland-flagged cells remain in the map footprint at `0` suitability percentile. Optional state-boundary, zoning-proxy, permitting / ordinance evidence, social-friction evidence, and hosting-capacity proxy layers provide bounded context overlays without replacing the base suitability surface.
 - The assumption registry JSON records the current scenario inputs, report-reference
   assumptions, bounded bundle rules, output labels, and explicit assumption gaps so
-  future report runs can be compared consistently.
+  future report runs can be compared consistently. Its temporal-assumption contract
+  makes the report reference explicit: 2025 operating data centers, modeled years
+  2025 through 2050 at the tracked reporting steps, and a 25-year cumulative
+  buildout horizon through 2050. The current bounded bundle keeps its configured
+  2022 starting-stock field until the 2025 source and exact report semantics can be
+	validated. It also records the capacity-constraint contract: public smoke configs
+	use an 0.88 utilization factor and a 1000 MW per-site time-step nameplate capacity
+	cap. When projected demand exceeds capped available capacity, the downscale output
+	remains capacity-limited rather than forcing excess load into a grid cell, and
+	cumulative outputs expose load and capacity-equivalent fields.
 - The limitations note carries forward the named LinkedIn refinement gaps such as local transmission hosting capacity, demand queue times, zoning, permitting, capacity scaling, and social acceptance so the bundle does not imply full siting fidelity. Zoning, permitting, social friction, and hosting now have bounded proxy layers, but the note keeps the limits explicit so proxy evidence is not misread as entitlement, permit readiness, social acceptance, or local interconnection feasibility.
 - The ReEDS integration contract JSON defines the current handoff products,
-  required columns, annual time assumptions, spatial keys, and validation checks
-  for using the bounded bundle in ReEDS-facing workflows.
+  required columns, annual time assumptions, capacity-constraint assumptions,
+  spatial keys, and validation checks for using the bounded bundle in ReEDS-facing
+  workflows.
 - The cumulative buildout GeoPackages add `baseline_total_dc_load_mw`,
-  `cumulative_new_dc_load_mw`, and `cumulative_total_dc_load_mw` so the bundle can
-  support cumulative buildout maps or downstream animation prep from the existing
-  time-stepped smoke outputs.
+  `cumulative_new_dc_load_mw`, `cumulative_total_dc_load_mw`, and capacity-equivalent
+  columns so the bundle can support cumulative buildout maps or downstream animation
+  prep from the existing time-stepped smoke outputs.
 - The deviation note is intentionally explicit: this is a bounded public
   approximation, not a report-equivalent reproduction.
 - Version-control policy: treat these report-bundle outputs as regenerated local deliverables. Commit the source code, tests, small input manifests, provenance, and documentation that recreate them; do not commit the generated HTML, GeoPackage, JSON, CSV, Markdown, or cache payloads under the bundle output directory.

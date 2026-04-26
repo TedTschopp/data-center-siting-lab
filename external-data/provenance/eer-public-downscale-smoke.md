@@ -25,6 +25,11 @@ The output is long-form rather than wide-form, with `year`, `total_dc_load_mw`, 
 `new_dc_load_mw` columns populated for years 2022, 2024, 2030, 2035, 2040, 2045,
 and 2050.
 
+Both public smoke configs now apply the report-parity capacity semantics explicitly:
+an `0.88` utilization factor converts site capacity into load-equivalent allocation
+limits, and `max_site_addition_per_time_step` caps each modeled time-step addition
+at `1000` MW of nameplate capacity per grid cell.
+
 These smoke tests validate execution compatibility of the public EER outputs through
 the repo's downscale workflow. They do **not** validate magnitude parity with the
 shipped fixture projections, which is explicitly out of scope for the public-source

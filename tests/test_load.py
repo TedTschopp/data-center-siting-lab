@@ -114,6 +114,42 @@ def test_downscale_total(data_dir, max_site_addition_per_year, reduce_output):
     assert_geodataframe_equal(results_df, expected_df, check_like=True)
 
 
+def test_downscale_total_applies_utilization_and_per_time_step_cap():
+    """Utilization should convert site capacity constraints into load-equivalent caps."""
+
+    grid_df = pd.DataFrame(
+        {
+            "suitability_score": [1.0, 1.0],
+            "existing_capacity_mw": [100.0, 0.0],
+            "developable_capacity_mw": [1_000.0, 1_000.0],
+        },
+        index=pd.Index([101, 102], name="cell_id"),
+    )
+    load_df = pd.DataFrame({"year": [2030], "dc_load_mw": [150.0]})
+
+    result = downscale_total(
+        grid_df=grid_df,
+        grid_priority_col="suitability_score",
+        grid_baseline_load_col="existing_capacity_mw",
+        baseline_year=2025,
+        grid_capacity_col="developable_capacity_mw",
+        load_df=load_df,
+        load_value_col="dc_load_mw",
+        load_year_col="year",
+        max_site_addition_per_time_step=100.0,
+        utilization_factor=0.88,
+        n_bootstraps=1,
+        random_seed=0,
+    )
+
+    baseline_rows = result[result["year"] == 2025].sort_values("cell_id")
+    projected_rows = result[result["year"] == 2030]
+
+    assert baseline_rows["total_dc_load_mw"].tolist() == [88.0, 0.0]
+    assert np.isclose(projected_rows["new_dc_load_mw"].sum(), 150.0)
+    assert projected_rows["new_dc_load_mw"].max() <= 88.0
+
+
 @pytest.mark.parametrize("max_site_addition_per_year", [1000, None])
 @pytest.mark.parametrize("reduce_output", [False, True])
 def test_downscale_regional(data_dir, max_site_addition_per_year, reduce_output):

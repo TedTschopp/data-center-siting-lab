@@ -5,7 +5,11 @@ from __future__ import annotations
 
 import argparse
 import json
+import sys
 from pathlib import Path
+
+REPO_ROOT = Path(__file__).resolve().parents[3]
+sys.path.insert(0, str(REPO_ROOT))
 
 from reVeal.grid import RegionalDownscaleGrid, TotalDownscaleGrid
 
@@ -61,7 +65,7 @@ def main(args=None):
     )
     parsed = parser.parse_args(args=args)
 
-    repo_root = Path(__file__).resolve().parents[3]
+    repo_root = REPO_ROOT
     config_path = repo_root / parsed.config
     output_path = repo_root / parsed.output
     output_path.parent.mkdir(parents=True, exist_ok=True)

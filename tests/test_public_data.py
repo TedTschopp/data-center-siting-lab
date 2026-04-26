@@ -21,6 +21,8 @@ from reVeal.public_data import (
     MMBTU_PER_YEAR_TO_AVERAGE_MW,
     PUBLIC_DATASET_CATALOG,
     _annotate_public_report_cell_names,
+    _apply_public_report_census_miss_classification,
+    _build_public_report_census_geolookup_miss_frame,
     _extract_public_report_census_geography_record,
     _fetch_public_report_census_geographies,
     _build_public_report_feasible_land_frame,
@@ -2484,6 +2486,47 @@ def test_fetch_public_report_census_geographies_replaces_projected_coordinate_co
     assert records.loc[0, "census_place_name"] == "Boulder"
 
 
+def test_build_public_report_census_geolookup_miss_frame_marks_boundary_display_label():
+    """Census misses near a state boundary should get a review class and honest display label."""
+
+    ranked = pd.DataFrame(
+        {
+            "national_rank": [1, 2],
+            "cell_id": [5925, 11375],
+            "census_geolookup_status": ["missing", "matched"],
+            "display_cell_name": ["Detroit", "Houston, Texas"],
+            "display_context_name": [None, None],
+            "general_american_cell_name": ["Detroit, Michigan", "Houston, Texas"],
+            "anchor_place_distance_miles": [3.0, 0.0],
+            "water_wetland_excluded": [False, False],
+            "water_wetland_share": [np.nan, 0.0],
+            "suitability_percentile": [99.5, 99.0],
+            "longitude": [-83.0, -95.5],
+            "latitude": [42.2, 29.7],
+        }
+    )
+    state_boundaries = gpd.GeoDataFrame(
+        {"state_name": ["Michigan"], "state_code": ["MI"]},
+        geometry=[box(-84.5, 41.5, -83.1, 43.0)],
+        crs="EPSG:4326",
+    )
+
+    miss_frame = _build_public_report_census_geolookup_miss_frame(ranked, state_boundaries)
+    classified = _apply_public_report_census_miss_classification(ranked, miss_frame)
+
+    assert len(miss_frame) == 1
+    assert miss_frame.loc[0, "cell_id"] == 5925
+    assert miss_frame.loc[0, "census_geolookup_miss_class"] == "near_state_boundary_or_coast"
+    assert miss_frame.loc[0, "nearest_state_code"] == "MI"
+    assert miss_frame.loc[0, "nearest_state_distance_miles"] < 10.0
+    assert miss_frame.loc[0, "map_impact_class"] == "high"
+    assert miss_frame.loc[0, "display_label_decision"] == "dedicated_boundary_coastal_display_label"
+    assert miss_frame.loc[0, "recommended_display_cell_name"] == "Boundary/coastal cell near Detroit"
+    assert classified.loc[0, "display_cell_name"] == "Boundary/coastal cell near Detroit"
+    assert classified.loc[0, "display_context_name"] == "Detroit"
+    assert pd.isna(classified.loc[1, "census_geolookup_miss_class"])
+
+
 def test_run_public_report_bundle_writes_manifest_and_deviation_note(tmp_path, monkeypatch, capsys):
     """The report-bundle runner should materialize a bounded output bundle plus deviations."""
 
@@ -2498,6 +2541,8 @@ def test_run_public_report_bundle_writes_manifest_and_deviation_note(tmp_path, m
     feasible_land_path = bundle_dir / "public_report_feasible_land.gpkg"
     suitability_path = bundle_dir / "public_report_suitability_percentiles.gpkg"
     ranked_suitability_path = bundle_dir / "public_report_suitability_ranked_cells.csv"
+    census_miss_csv_path = bundle_dir / "public_report_census_geolookup_misses.csv"
+    census_miss_note_path = bundle_dir / "public_report_census_geolookup_misses.md"
     state_boundary_path = bundle_dir / "public_report_state_boundaries.gpkg"
     hosting_capacity_proxy_path = bundle_dir / "public_report_hosting_capacity_proxy.gpkg"
     permitting_proxy_path = bundle_dir / "public_report_permitting_proxy.gpkg"
@@ -2524,7 +2569,8 @@ def test_run_public_report_bundle_writes_manifest_and_deviation_note(tmp_path, m
                 "load_projections": "external-data/derived/eer/eer_public_central_high_data_center_national.csv",
                 "load_value": "dc_load_mw",
                 "load_year": "year",
-                "max_site_addition_per_year": 1000,
+                "utilization_factor": 0.88,
+                "max_site_addition_per_time_step": 1000,
                 "site_saturation_limit": 0.5,
                 "priority_power": 100,
                 "n_bootstraps": 500,
@@ -2548,7 +2594,8 @@ def test_run_public_report_bundle_writes_manifest_and_deviation_note(tmp_path, m
                 "regions": "tests/data/downscale/inputs/regions/eer_adp_zones.gpkg",
                 "region_names": "zone_group",
                 "load_regions": "zone_group",
-                "max_site_addition_per_year": 1000,
+                "utilization_factor": 0.88,
+                "max_site_addition_per_time_step": 1000,
                 "site_saturation_limit": 0.5,
                 "priority_power": 100,
                 "n_bootstraps": 100,
@@ -2782,6 +2829,8 @@ def test_run_public_report_bundle_writes_manifest_and_deviation_note(tmp_path, m
     assert feasible_land_path.exists()
     assert suitability_path.exists()
     assert ranked_suitability_path.exists()
+    assert census_miss_csv_path.exists()
+    assert census_miss_note_path.exists()
     assert state_boundary_path.exists()
     assert hosting_capacity_proxy_path.exists()
     assert permitting_proxy_path.exists()
@@ -2807,6 +2856,8 @@ def test_run_public_report_bundle_writes_manifest_and_deviation_note(tmp_path, m
     assert feasible_land_path.as_posix() in manifest["output_paths"]
     assert suitability_path.as_posix() in manifest["output_paths"]
     assert ranked_suitability_path.as_posix() in manifest["output_paths"]
+    assert census_miss_csv_path.as_posix() in manifest["output_paths"]
+    assert census_miss_note_path.as_posix() in manifest["output_paths"]
     assert state_boundary_path.as_posix() in manifest["output_paths"]
     assert hosting_capacity_proxy_path.as_posix() in manifest["output_paths"]
     assert permitting_proxy_path.as_posix() in manifest["output_paths"]
@@ -2826,18 +2877,55 @@ def test_run_public_report_bundle_writes_manifest_and_deviation_note(tmp_path, m
     assert assumption_registry["bundle_label"] == "bounded-public-report-bundle"
     assert assumption_registry["report_reference"]["baseline_year"] == 2025
     assert assumption_registry["report_reference"]["utilization_factor"] == 0.88
+    assert assumption_registry["report_reference"]["max_site_addition_per_time_step_mw"] == 1000
     assert assumption_registry["current_bundle"]["baseline_year"] == 2022
+    capacity_assumptions = assumption_registry["capacity_constraint_assumptions"]
+    assert capacity_assumptions["report_reference"] == {
+        "utilization_factor": 0.88,
+        "max_site_addition_per_time_step_mw": 1000,
+        "load_to_capacity_rule": "capacity_mw = load_mw / utilization_factor",
+    }
+    assert capacity_assumptions["current_bundle"]["utilization_factors"] == [0.88]
+    assert capacity_assumptions["current_bundle"]["max_site_addition_per_time_step_mw"] == [1000]
+    assert capacity_assumptions["current_bundle"]["max_site_addition_per_year_mw"] == []
+    assert capacity_assumptions["parity_status"] == "value-aligned"
+    temporal_assumptions = assumption_registry["temporal_assumptions"]
+    assert temporal_assumptions["report_reference"] == {
+        "starting_stock_year": 2025,
+        "starting_stock_source": "Baxtel 2025 operating data centers",
+        "modeled_years": [2025, 2030, 2035, 2040, 2045, 2050],
+        "first_projection_year": 2030,
+        "terminal_year": 2050,
+        "buildout_horizon_years": 25,
+    }
+    assert temporal_assumptions["current_bundle"]["starting_stock_year"] == 2022
+    assert temporal_assumptions["current_bundle"]["starting_stock_fields"] == ["dc_capacity_mw_existing"]
+    assert temporal_assumptions["current_bundle"]["modeled_years"] == [2022, 2030, 2035]
+    assert temporal_assumptions["current_bundle"]["first_projection_year"] == 2030
+    assert temporal_assumptions["current_bundle"]["terminal_year"] == 2035
+    assert temporal_assumptions["current_bundle"]["buildout_horizon_years"] == 13
+    assert temporal_assumptions["parity_status"] == "blocked"
+    assert set(temporal_assumptions["parity_blockers"]) == {
+        "starting_stock_year_mismatch",
+        "starting_stock_source_mismatch",
+        "terminal_year_mismatch",
+        "buildout_horizon_mismatch",
+        "modeled_years_mismatch",
+    }
     assert assumption_registry["current_bundle"]["feasible_land_rule"] == (
         "developable_capacity_mw > 0; cells with NLCD water/wetland share across classes 11, 90, and 95 >= 0.5 are retained and clamped to 0 suitability percentile"
     )
     assert assumption_registry["current_bundle"]["suitability_percentile_rule"] == "percentile rank of suitability_score across developable cells, with water/wetland-excluded cells clamped to 0"
     assert assumption_registry["current_bundle"]["ranked_summary_rule"] == "sort by suitability_percentile desc, suitability_score desc, developable_capacity_mw desc, sc_point_gid asc"
     assert [item["projection_resolution"] for item in assumption_registry["scenario_inputs"]] == ["total", "regional"]
-    assert assumption_registry["scenario_inputs"][0]["max_site_addition_per_year_mw"] == 1000
+    assert assumption_registry["scenario_inputs"][0]["utilization_factor"] == 0.88
+    assert assumption_registry["scenario_inputs"][0]["max_site_addition_per_time_step_mw"] == 1000
     assert assumption_registry["scenario_inputs"][1]["region_names"] == "zone_group"
     output_labels = {item["label"] for item in assumption_registry["output_labels"]}
     assert "public_report_feasible_land" in output_labels
     assert "public_report_suitability_ranked_cells" in output_labels
+    assert "public_report_census_geolookup_misses_csv" in output_labels
+    assert "public_report_census_geolookup_misses_note" in output_labels
     assert "public_report_state_boundaries" in output_labels
     assert "public_report_hosting_capacity_proxy" in output_labels
     assert "public_report_permitting_proxy" in output_labels
@@ -2925,6 +3013,13 @@ def test_run_public_report_bundle_writes_manifest_and_deviation_note(tmp_path, m
     assert "drop-shadow(0 0 3px rgba(196, 92, 19, 0.45))" in suitability_map_html
     gap_names = {item["name"] for item in assumption_registry["assumption_gaps"]}
     assert "report_reference_utilization_factor" in gap_names
+    utilization_gap = next(
+        item
+        for item in assumption_registry["assumption_gaps"]
+        if item["name"] == "report_reference_utilization_factor"
+    )
+    assert utilization_gap["status"] == "configured-in-current-bundle"
+    assert "report_reference_per_site_capacity_constraint" in gap_names
     assert "report_reference_initial_locations" in gap_names
     limitation_names = {item["name"] for item in assumption_registry["limitation_carry_forward"]}
     assert "local_transmission_hosting_capacity" in limitation_names
@@ -2964,6 +3059,20 @@ def test_run_public_report_bundle_writes_manifest_and_deviation_note(tmp_path, m
     assert reeds_contract["temporal_contract"]["current_bundle_baseline_year"] == 2022
     assert reeds_contract["temporal_contract"]["report_reference_baseline_year"] == 2025
     assert reeds_contract["temporal_contract"]["modeled_years"] == [2022, 2030, 2035]
+    assert reeds_contract["temporal_contract"]["report_reference_modeled_years"] == [
+        2025,
+        2030,
+        2035,
+        2040,
+        2045,
+        2050,
+    ]
+    assert reeds_contract["temporal_contract"]["current_bundle_buildout_horizon_years"] == 13
+    assert reeds_contract["temporal_contract"]["report_reference_buildout_horizon_years"] == 25
+    assert reeds_contract["temporal_contract"]["temporal_parity_status"] == "blocked"
+    assert reeds_contract["capacity_constraint_contract"]["utilization_factor"] == 0.88
+    assert reeds_contract["capacity_constraint_contract"]["max_site_addition_per_time_step_mw"] == 1000
+    assert reeds_contract["capacity_constraint_contract"]["per_site_time_step_capacity_validation_status"] == "passed"
     assert reeds_contract["spatial_contract"]["grid_cell_key"] == "sc_point_gid"
     assert reeds_contract["spatial_contract"]["report_reference_grid_resolution_km"] == 5.76
     handoff_labels = {item["label"] for item in reeds_contract["handoff_products"]}
@@ -2980,6 +3089,11 @@ def test_run_public_report_bundle_writes_manifest_and_deviation_note(tmp_path, m
     assert "demand queue times" in limitations_text.lower()
     assert "zoning" in limitations_text.lower()
     assert "permitting and ordinance" in limitations_text.lower()
+    census_miss_note = census_miss_note_path.read_text()
+    assert "Census GeoLookup Miss Classification" in census_miss_note
+    assert "Census GeoLookup enabled: no" in census_miss_note
+    assert "Census missing/error cells: 0" in census_miss_note
+    assert "dedicated boundary/coastal display label" in census_miss_note
 
     zoning_proxy = gpd.read_file(zoning_proxy_path).sort_values("sc_point_gid").reset_index(drop=True)
     assert list(zoning_proxy["sc_point_gid"]) == [2, 3, 4]
@@ -3105,12 +3219,22 @@ def test_run_public_report_bundle_writes_manifest_and_deviation_note(tmp_path, m
     assert total_rows["baseline_total_dc_load_mw"].tolist() == [3.6, 3.6, 3.6]
     assert total_rows["cumulative_new_dc_load_mw"].tolist() == [0.0, 2.0, 5.0]
     assert total_rows["cumulative_total_dc_load_mw"].tolist() == [3.6, 5.6, 8.6]
+    assert np.allclose(
+        total_rows["cumulative_total_dc_capacity_mw"].tolist(),
+        [3.6 / 0.88, 5.6 / 0.88, 8.6 / 0.88],
+    )
+    assert total_rows["per_site_time_step_capacity_limit_exceeded"].tolist() == [False, False, False]
 
     summary = pd.read_csv(summary_path)
     summary = summary.sort_values(["source_output_name", "year"])
     total_summary = summary[summary["source_output_name"] == "public_eer_total_downscaled"]
     assert total_summary["year"].tolist() == [2022, 2030, 2035]
     assert total_summary["cumulative_total_dc_load_mw"].tolist() == [4.6, 6.6, 13.6]
+    assert np.allclose(
+        total_summary["cumulative_total_dc_capacity_mw"].tolist(),
+        [4.6 / 0.88, 6.6 / 0.88, 13.6 / 0.88],
+    )
+    assert total_summary["per_site_time_step_capacity_limit_exceeded"].tolist() == [0, 0, 0]
 
     deviation_text = deviation_path.read_text()
     assert "baseline year" in deviation_text.lower()

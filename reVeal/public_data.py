@@ -40,10 +40,23 @@ PUBLIC_REPORT_BUNDLE_GRID_PATH = "tests/data/downscale/inputs/grid_char_weighted
 PUBLIC_REPORT_BUNDLE_GRID_PRIORITY = "suitability_score"
 PUBLIC_REPORT_BUNDLE_BASELINE_YEAR = 2022
 PUBLIC_REPORT_BUNDLE_REPORT_BASELINE_YEAR = 2025
+PUBLIC_REPORT_REFERENCE_TERMINAL_YEAR = 2050
+PUBLIC_REPORT_REFERENCE_MODELED_YEARS = (
+    PUBLIC_REPORT_BUNDLE_REPORT_BASELINE_YEAR,
+    2030,
+    2035,
+    2040,
+    2045,
+    PUBLIC_REPORT_REFERENCE_TERMINAL_YEAR,
+)
+PUBLIC_REPORT_REFERENCE_BUILDOUT_HORIZON_YEARS = (
+    PUBLIC_REPORT_REFERENCE_TERMINAL_YEAR - PUBLIC_REPORT_BUNDLE_REPORT_BASELINE_YEAR
+)
 PUBLIC_REPORT_BUNDLE_TOTAL_CONFIG_PATH = "external-data/derived/eer/config_public_total_smoke.json"
 PUBLIC_REPORT_BUNDLE_REGIONAL_CONFIG_PATH = "external-data/derived/eer/config_public_regional_smoke.json"
 PUBLIC_REPORT_REFERENCE_GRID_RESOLUTION_KM = 5.76
 PUBLIC_REPORT_REFERENCE_UTILIZATION_FACTOR = 0.88
+PUBLIC_REPORT_REFERENCE_MAX_SITE_ADDITION_PER_TIME_STEP_MW = 1000
 PUBLIC_REPORT_REFERENCE_INITIAL_LOCATIONS = "Baxtel 2025 operating data centers"
 PUBLIC_REPORT_STATE_BOUNDARY_SOURCE_URL = (
     "https://www2.census.gov/geo/tiger/GENZ2024/shp/cb_2024_us_state_20m.zip"
@@ -67,6 +80,10 @@ PUBLIC_REPORT_CENSUS_GEOLOOKUP_LAYERS = (
     "Census Tracts",
     "2020 Census Blocks",
 )
+PUBLIC_REPORT_CENSUS_MISS_NEAR_STATE_DISTANCE_MILES = 25.0
+PUBLIC_REPORT_CENSUS_MISS_LOCAL_ANCHOR_DISTANCE_MILES = 75.0
+PUBLIC_REPORT_CENSUS_MISS_HIGH_IMPACT_PERCENTILE = 90.0
+PUBLIC_REPORT_CENSUS_MISS_MEDIUM_IMPACT_PERCENTILE = 50.0
 PUBLIC_NLCD_REPRESENTATIVE_BASENAME = "Annual_NLCD_LndCov_2023_CU_C1V0"
 PUBLIC_NLCD_REPRESENTATIVE_ZIP_NAME = f"{PUBLIC_NLCD_REPRESENTATIVE_BASENAME}.zip"
 PUBLIC_NLCD_REPRESENTATIVE_TIF_NAME = f"{PUBLIC_NLCD_REPRESENTATIVE_BASENAME}.tif"
@@ -4018,7 +4035,8 @@ def _write_public_report_bundle_readme(output_dir):
                 "",
                 "Regenerate the local bundle whenever you need the HTML map, GeoPackages, manifest,",
                 "status JSON, deviation note, ranked CSV, cumulative buildout surfaces, or cached",
-                "state-boundary source ZIP. The default run also writes a generated",
+                "state-boundary source ZIP. The default run also writes Census GeoLookup miss review",
+                "artifacts and a generated",
                 "`public_report_census_geography_cache.json` file for Census coordinate GeoLookup",
                 "identity enrichment; pass `--no-census-geolookup` to skip that online enrichment.",
                 "",
@@ -4041,6 +4059,14 @@ def _report_bundle_deviation_lines(repo_root):
         (
             f"- The current bundle uses baseline year `{PUBLIC_REPORT_BUNDLE_BASELINE_YEAR}` while "
             f"the report narrative frames the scenario around operating data centers in `{PUBLIC_REPORT_BUNDLE_REPORT_BASELINE_YEAR}`."
+        ),
+        (
+            f"- The report-parity temporal contract is now encoded as metadata: the report reference starts from "
+            f"`{PUBLIC_REPORT_BUNDLE_REPORT_BASELINE_YEAR}` operating data centers, uses modeled years "
+            f"`{list(PUBLIC_REPORT_REFERENCE_MODELED_YEARS)}`, and carries a "
+            f"`{PUBLIC_REPORT_REFERENCE_BUILDOUT_HORIZON_YEARS}`-year cumulative buildout horizon through "
+            f"`{PUBLIC_REPORT_REFERENCE_TERMINAL_YEAR}`. The current bounded bundle keeps its existing "
+            "smoke-test buildout behavior until the 2025 starting-stock source and exact temporal semantics are validated."
         ),
         (
             f"- The current grid priority field is `{PUBLIC_REPORT_BUNDLE_GRID_PRIORITY}`, "
@@ -5195,6 +5221,14 @@ def _build_public_report_ranked_suitability_summary(frame):
         "census_national_region_name",
         "census_tract_geoid",
         "census_block_geoid",
+        "census_geolookup_miss_class",
+        "census_geolookup_nearest_state_name",
+        "census_geolookup_nearest_state_code",
+        "census_geolookup_nearest_state_distance_miles",
+        "census_geolookup_nearest_state_region_name",
+        "census_geolookup_nearest_national_region_name",
+        "census_geolookup_map_impact_class",
+        "census_geolookup_display_label_decision",
         "cell_name_basis",
         "cell_name_is_disambiguated",
         "anchor_place_name",
@@ -5226,6 +5260,303 @@ def _build_public_report_ranked_suitability_summary(frame):
     ordered_columns = [column for column in preferred_columns if column in ranked.columns]
     remaining_columns = [column for column in ranked.columns if column not in ordered_columns]
     return ranked[ordered_columns + remaining_columns]
+
+
+def _empty_public_report_census_geolookup_miss_frame():
+    columns = [
+        "national_rank",
+        "cell_id",
+        "census_geolookup_status",
+        "census_geolookup_miss_class",
+        "nearest_state_name",
+        "nearest_state_code",
+        "nearest_state_distance_miles",
+        "nearest_state_region_name",
+        "nearest_national_region_name",
+        "map_impact_class",
+        "water_wetland_exclusion_status",
+        "water_wetland_excluded",
+        "water_wetland_share",
+        "suitability_percentile",
+        "longitude",
+        "latitude",
+        "original_display_cell_name",
+        "original_display_context_name",
+        "recommended_display_cell_name",
+        "recommended_display_context_name",
+        "display_label_decision",
+        "fallback_review_note",
+    ]
+    return pd.DataFrame(columns=columns)
+
+
+def _classify_public_report_census_miss_map_impact(row):
+    percentile = pd.to_numeric(pd.Series([row.get("suitability_percentile")]), errors="coerce").iloc[0]
+    water_wetland_excluded = bool(row.get("water_wetland_excluded")) if pd.notna(
+        row.get("water_wetland_excluded")
+    ) else False
+    if water_wetland_excluded or (pd.notna(percentile) and float(percentile) == 0.0):
+        return "clamped_zero"
+    if pd.notna(percentile) and float(percentile) >= PUBLIC_REPORT_CENSUS_MISS_HIGH_IMPACT_PERCENTILE:
+        return "high"
+    if pd.notna(percentile) and float(percentile) >= PUBLIC_REPORT_CENSUS_MISS_MEDIUM_IMPACT_PERCENTILE:
+        return "medium"
+    return "low"
+
+
+def _format_public_report_census_miss_display_label(row, nearest_state_name, nearest_state_code):
+    existing_display = _clean_public_report_text(row.get("display_cell_name"))
+    general_name = _clean_public_report_text(row.get("general_american_cell_name"))
+    anchor_distance = pd.to_numeric(pd.Series([row.get("anchor_place_distance_miles")]), errors="coerce").iloc[0]
+    anchor_is_local = pd.notna(anchor_distance) and float(anchor_distance) <= float(
+        PUBLIC_REPORT_CENSUS_MISS_LOCAL_ANCHOR_DISTANCE_MILES
+    )
+    if existing_display is not None and anchor_is_local:
+        place_label = existing_display
+    elif general_name is not None and general_name.lower().startswith("near "):
+        place_label = general_name[5:]
+    else:
+        place_label = _clean_public_report_text(nearest_state_name or nearest_state_code)
+    if place_label is None:
+        return "Boundary/coastal retained cell"
+    return f"Boundary/coastal cell near {place_label}"
+
+
+def _build_public_report_census_geolookup_miss_frame(ranked_suitability, state_boundaries):
+    """Classify retained cells where Census GeoLookup did not return named geography."""
+    ranked = pd.DataFrame(ranked_suitability).copy()
+    if "census_geolookup_status" not in ranked.columns:
+        return _empty_public_report_census_geolookup_miss_frame()
+
+    missing_mask = ranked["census_geolookup_status"].fillna("missing") != "matched"
+    misses = ranked.loc[missing_mask].copy()
+    if misses.empty:
+        return _empty_public_report_census_geolookup_miss_frame()
+
+    states = gpd.GeoDataFrame(state_boundaries).copy()
+    if states.empty or "geometry" not in states.columns:
+        return _empty_public_report_census_geolookup_miss_frame()
+    if states.crs is None:
+        states = states.set_crs("EPSG:4326", allow_override=True)
+    states = states[[column for column in ("state_name", "state_code", "geometry") if column in states.columns]]
+    for column in ("state_name", "state_code"):
+        if column not in states.columns:
+            states[column] = None
+
+    point_frame = gpd.GeoDataFrame(
+        misses,
+        geometry=gpd.points_from_xy(misses["longitude"], misses["latitude"]),
+        crs="EPSG:4326",
+    )
+    contains_points = point_frame.to_crs(states.crs)
+    distance_states = states.to_crs("EPSG:5070")
+    distance_points = point_frame.to_crs("EPSG:5070")
+
+    rows = []
+    for index, row in misses.iterrows():
+        point_geometry = contains_points.geometry.loc[index]
+        distance_geometry = distance_points.geometry.loc[index]
+        state_cover_mask = states.geometry.covers(point_geometry)
+        within_state_boundary = bool(state_cover_mask.any())
+        distances = distance_states.geometry.distance(distance_geometry)
+        nearest_state_index = distances.idxmin()
+        nearest_state = distance_states.loc[nearest_state_index]
+        nearest_state_distance_miles = float(distances.loc[nearest_state_index]) / 1609.344
+        nearest_state_name = _clean_public_report_text(nearest_state.get("state_name"))
+        nearest_state_code = _clean_public_report_text(nearest_state.get("state_code"))
+
+        if within_state_boundary:
+            miss_class = "inside_state_boundary_unmatched"
+            display_label_decision = "bounded_catalog_fallback_sufficient_with_review"
+            recommended_display_cell_name = _clean_public_report_text(row.get("display_cell_name"))
+            recommended_display_context_name = _clean_public_report_text(row.get("display_context_name"))
+        elif nearest_state_distance_miles <= PUBLIC_REPORT_CENSUS_MISS_NEAR_STATE_DISTANCE_MILES:
+            miss_class = "near_state_boundary_or_coast"
+            display_label_decision = "dedicated_boundary_coastal_display_label"
+            recommended_display_cell_name = _format_public_report_census_miss_display_label(
+                row,
+                nearest_state_name,
+                nearest_state_code,
+            )
+            original_display = _clean_public_report_text(row.get("display_cell_name"))
+            recommended_display_context_name = original_display if original_display else None
+        else:
+            miss_class = "outside_state_boundary"
+            display_label_decision = "dedicated_outside_boundary_display_label"
+            recommended_display_cell_name = _format_public_report_census_miss_display_label(
+                row,
+                nearest_state_name,
+                nearest_state_code,
+            )
+            recommended_display_context_name = _clean_public_report_text(row.get("display_cell_name"))
+
+        water_wetland_excluded = bool(row.get("water_wetland_excluded")) if pd.notna(
+            row.get("water_wetland_excluded")
+        ) else False
+        rows.append(
+            {
+                "national_rank": row.get("national_rank"),
+                "cell_id": row.get("cell_id"),
+                "census_geolookup_status": row.get("census_geolookup_status"),
+                "census_geolookup_miss_class": miss_class,
+                "nearest_state_name": nearest_state_name,
+                "nearest_state_code": nearest_state_code,
+                "nearest_state_distance_miles": round(nearest_state_distance_miles, 3),
+                "nearest_state_region_name": _select_public_report_state_region(
+                    row.get("latitude"),
+                    row.get("longitude"),
+                    nearest_state_code,
+                ),
+                "nearest_national_region_name": _select_public_report_national_region(
+                    nearest_state_code
+                ),
+                "map_impact_class": _classify_public_report_census_miss_map_impact(row),
+                "water_wetland_exclusion_status": "water_wetland_clamped"
+                if water_wetland_excluded
+                else "not_water_wetland_clamped",
+                "water_wetland_excluded": water_wetland_excluded,
+                "water_wetland_share": row.get("water_wetland_share"),
+                "suitability_percentile": row.get("suitability_percentile"),
+                "longitude": row.get("longitude"),
+                "latitude": row.get("latitude"),
+                "original_display_cell_name": row.get("display_cell_name"),
+                "original_display_context_name": row.get("display_context_name"),
+                "recommended_display_cell_name": recommended_display_cell_name,
+                "recommended_display_context_name": recommended_display_context_name,
+                "display_label_decision": display_label_decision,
+                "fallback_review_note": (
+                    "Census did not return named geography for the representative point; "
+                    "use nearest-state boundary/coastal classification and bounded catalog label as review context."
+                ),
+            }
+        )
+    return pd.DataFrame(rows)
+
+
+def _apply_public_report_census_miss_classification(frame, miss_frame):
+    """Attach Census miss review fields and display labels to a report cell frame."""
+    classified = frame.copy()
+    if miss_frame is None or miss_frame.empty or "cell_id" not in classified.columns:
+        return classified
+    miss_by_cell = pd.DataFrame(miss_frame).set_index("cell_id")
+    cell_ids = classified["cell_id"]
+    mapped_columns = {
+        "census_geolookup_miss_class": "census_geolookup_miss_class",
+        "nearest_state_name": "census_geolookup_nearest_state_name",
+        "nearest_state_code": "census_geolookup_nearest_state_code",
+        "nearest_state_distance_miles": "census_geolookup_nearest_state_distance_miles",
+        "nearest_state_region_name": "census_geolookup_nearest_state_region_name",
+        "nearest_national_region_name": "census_geolookup_nearest_national_region_name",
+        "map_impact_class": "census_geolookup_map_impact_class",
+        "display_label_decision": "census_geolookup_display_label_decision",
+    }
+    for source_column, target_column in mapped_columns.items():
+        classified[target_column] = cell_ids.map(miss_by_cell[source_column])
+    for source_column, target_column in (
+        ("recommended_display_cell_name", "display_cell_name"),
+        ("recommended_display_context_name", "display_context_name"),
+    ):
+        replacement_values = cell_ids.map(miss_by_cell[source_column])
+        replacement_mask = replacement_values.notna()
+        classified.loc[replacement_mask, target_column] = replacement_values.loc[replacement_mask]
+    return classified
+
+
+def _value_counts_dict(series):
+    return {
+        str(key): int(value)
+        for key, value in series.value_counts(dropna=False).sort_index().items()
+    }
+
+
+def _write_public_report_census_geolookup_miss_artifacts(
+    output_dir,
+    ranked_suitability,
+    miss_frame,
+):
+    """Write row-level and narrative Census GeoLookup miss review artifacts."""
+    output_dir = Path(output_dir)
+    miss_frame = pd.DataFrame(miss_frame).copy()
+    ranked = pd.DataFrame(ranked_suitability)
+    miss_csv_path = output_dir / "public_report_census_geolookup_misses.csv"
+    miss_note_path = output_dir / "public_report_census_geolookup_misses.md"
+    miss_frame.to_csv(miss_csv_path, index=False)
+
+    total_cells = int(len(ranked))
+    if "census_geolookup_status" in ranked.columns:
+        matched_cells = int((ranked["census_geolookup_status"].fillna("missing") == "matched").sum())
+        geolookup_enabled = True
+    else:
+        matched_cells = 0
+        geolookup_enabled = False
+    missing_cells = int(len(miss_frame))
+    lines = [
+        "# Census GeoLookup Miss Classification",
+        "",
+        "This generated review note classifies retained report cells where the Census coordinate GeoLookup response did not return named geography.",
+        "",
+        "## Summary",
+        "",
+        f"- Census GeoLookup enabled: {'yes' if geolookup_enabled else 'no'}",
+        f"- Retained ranked cells: {total_cells}",
+        f"- Census matched cells: {matched_cells}",
+        f"- Census missing/error cells: {missing_cells}",
+    ]
+    if not miss_frame.empty:
+        max_distance = miss_frame["nearest_state_distance_miles"].max()
+        lines.extend(
+            [
+                f"- Maximum nearest-state distance for misses: {float(max_distance):.1f} miles",
+                "",
+                "## Classification Counts",
+                "",
+                "### Location Class",
+                "",
+            ]
+        )
+        lines.extend(
+            f"- {key}: {value}"
+            for key, value in _value_counts_dict(miss_frame["census_geolookup_miss_class"]).items()
+        )
+        lines.extend(["", "### Map Impact", ""])
+        lines.extend(
+            f"- {key}: {value}"
+            for key, value in _value_counts_dict(miss_frame["map_impact_class"]).items()
+        )
+        lines.extend(["", "### Water/Wetland Status", ""])
+        lines.extend(
+            f"- {key}: {value}"
+            for key, value in _value_counts_dict(miss_frame["water_wetland_exclusion_status"]).items()
+        )
+        lines.extend(["", "### Nearest State Fallback", ""])
+        lines.extend(
+            f"- {key}: {value}"
+            for key, value in _value_counts_dict(miss_frame["nearest_state_code"]).items()
+        )
+        high_impact = miss_frame.loc[miss_frame["map_impact_class"] == "high"]
+        if not high_impact.empty:
+            lines.extend(["", "## High-Impact Misses", ""])
+            for _, row in high_impact.sort_values("national_rank").iterrows():
+                lines.append(
+                    f"- Rank {int(row['national_rank'])}, cell {int(row['cell_id'])}: "
+                    f"{row['recommended_display_cell_name']} "
+                    f"({float(row['suitability_percentile']):.1f} percentile; "
+                    f"{float(row['nearest_state_distance_miles']):.1f} miles from {row['nearest_state_code']})"
+                )
+    lines.extend(
+        [
+            "",
+            "## Decision",
+            "",
+            "The bounded catalog fallback alone is not treated as an authoritative place identity for Census misses.",
+            "For retained cells whose representative point falls outside named Census geography, the bundle now records nearest-state boundary/coastal classification and applies a dedicated boundary/coastal display label in the ranked output. No Census place, county, metro, state, division, or region is inferred for those rows.",
+            "",
+            "The row-level CSV next to this note is the review surface for deciding whether a future coastal/offshore naming rule should become more specific.",
+            "",
+        ]
+    )
+    miss_note_path.write_text("\n".join(lines))
+    return {"outputs": [miss_csv_path.as_posix(), miss_note_path.as_posix()]}
 
 
 def _load_public_report_bundle_smoke_configs(repo_root):
@@ -5265,6 +5596,16 @@ def _build_public_report_output_labels(output_dir):
             "label": "public_report_suitability_ranked_cells",
             "path": (output_dir / "public_report_suitability_ranked_cells.csv").as_posix(),
             "description": "bounded nationwide ranked suitability table sorted by percentile, score, developable capacity, and stable cell identifier",
+        },
+        {
+            "label": "public_report_census_geolookup_misses_csv",
+            "path": (output_dir / "public_report_census_geolookup_misses.csv").as_posix(),
+            "description": "row-level review table for retained cells where Census coordinate GeoLookup did not return named geography",
+        },
+        {
+            "label": "public_report_census_geolookup_misses_note",
+            "path": (output_dir / "public_report_census_geolookup_misses.md").as_posix(),
+            "description": "summary and display-label decision note for Census GeoLookup misses in retained report cells",
         },
         {
             "label": "public_report_state_boundaries",
@@ -5338,7 +5679,9 @@ def _build_public_report_scenario_input(output_label, config_path, config):
         "grid_baseline_load": config.get("grid_baseline_load"),
         "grid_capacity": config.get("grid_capacity"),
         "baseline_year": config.get("baseline_year"),
+        "utilization_factor": config.get("utilization_factor"),
         "max_site_addition_per_year_mw": config.get("max_site_addition_per_year"),
+        "max_site_addition_per_time_step_mw": config.get("max_site_addition_per_time_step"),
         "site_saturation_limit": config.get("site_saturation_limit"),
         "priority_power": config.get("priority_power"),
         "n_bootstraps": config.get("n_bootstraps"),
@@ -5351,11 +5694,199 @@ def _build_public_report_scenario_input(output_label, config_path, config):
     return entry
 
 
+def _sorted_unique_public_report_ints(values):
+    cleaned = []
+    for value in values:
+        if value is None or pd.isna(value):
+            continue
+        cleaned.append(int(value))
+    return sorted(set(cleaned))
+
+
+def _normalize_public_report_number(value):
+    if value is None or pd.isna(value):
+        return None
+    number = float(value)
+    return int(number) if number.is_integer() else number
+
+
+def _sorted_unique_public_report_numbers(values):
+    cleaned = []
+    for value in values:
+        normalized = _normalize_public_report_number(value)
+        if normalized is not None:
+            cleaned.append(normalized)
+    return sorted(set(cleaned))
+
+
+def _load_public_report_cumulative_buildout_years(output_dir):
+    summary_path = Path(output_dir) / "public_report_bundle_cumulative_buildout_summary.csv"
+    if not summary_path.exists():
+        return []
+    summary = pd.read_csv(summary_path, usecols=["year"])
+    return _sorted_unique_public_report_ints(summary["year"])
+
+
+def _first_public_report_projection_year(years, starting_stock_year):
+    if starting_stock_year is None:
+        return None
+    future_years = [year for year in years if year > starting_stock_year]
+    return future_years[0] if future_years else None
+
+
+def _build_public_report_capacity_constraint_assumptions(smoke_configs):
+    """Build the report-parity capacity and utilization constraint contract."""
+    utilization_factors = _sorted_unique_public_report_numbers(
+        config.get("utilization_factor", 1.0) for _, _, config in smoke_configs
+    )
+    max_site_addition_per_time_step = _sorted_unique_public_report_numbers(
+        config.get("max_site_addition_per_time_step") for _, _, config in smoke_configs
+    )
+    max_site_addition_per_year = _sorted_unique_public_report_numbers(
+        config.get("max_site_addition_per_year") for _, _, config in smoke_configs
+    )
+    report_reference = {
+        "utilization_factor": PUBLIC_REPORT_REFERENCE_UTILIZATION_FACTOR,
+        "max_site_addition_per_time_step_mw": PUBLIC_REPORT_REFERENCE_MAX_SITE_ADDITION_PER_TIME_STEP_MW,
+        "load_to_capacity_rule": "capacity_mw = load_mw / utilization_factor",
+    }
+    current_bundle = {
+        "utilization_factors": utilization_factors,
+        "max_site_addition_per_time_step_mw": max_site_addition_per_time_step,
+        "max_site_addition_per_year_mw": max_site_addition_per_year,
+        "capacity_to_load_rule": "load_mw = capacity_mw * utilization_factor for grid-capacity and per-site limits",
+        "capacity_equivalent_output_rule": "cumulative buildout outputs include capacity-equivalent columns derived as load_mw / utilization_factor",
+        "capacity_limited_allocation_rule": "when projected demand exceeds available capped capacity, output remains capacity-limited instead of forcing excess load into a grid cell",
+    }
+    alignment_checks = {
+        "utilization_factor_matches": utilization_factors
+        == [PUBLIC_REPORT_REFERENCE_UTILIZATION_FACTOR],
+        "per_time_step_limit_matches": max_site_addition_per_time_step
+        == [PUBLIC_REPORT_REFERENCE_MAX_SITE_ADDITION_PER_TIME_STEP_MW],
+        "per_year_limit_not_used": len(max_site_addition_per_year) == 0,
+    }
+    blockers = [name for name, passed in alignment_checks.items() if not passed]
+    return {
+        "contract_type": "report-parity-capacity-constraint-contract",
+        "report_reference": report_reference,
+        "current_bundle": current_bundle,
+        "alignment_checks": alignment_checks,
+        "parity_status": "value-aligned" if not blockers else "blocked",
+        "parity_blockers": blockers,
+        "implementation_decision": (
+            "Apply the 88% utilization factor to convert capacity constraints into load-equivalent "
+            "limits for downscaling, and emit capacity-equivalent cumulative buildout fields for review. "
+            "Exact report semantics remain bounded until the report source data and allocation rules are recovered."
+        ),
+    }
+
+
+def _build_public_report_temporal_assumptions(repo_root, output_dir, smoke_configs=None):
+    """Build the report-parity temporal assumption contract for the bounded bundle."""
+    repo_root = Path(repo_root).resolve()
+    smoke_configs = smoke_configs or _load_public_report_bundle_smoke_configs(repo_root)
+    baseline_years = _sorted_unique_public_report_ints(
+        config.get("baseline_year") for _, _, config in smoke_configs
+    )
+    starting_stock_fields = sorted(
+        {
+            str(config.get("grid_baseline_load"))
+            for _, _, config in smoke_configs
+            if config.get("grid_baseline_load")
+        }
+    )
+    current_starting_stock_year = baseline_years[0] if len(baseline_years) == 1 else None
+    current_modeled_years = _load_public_report_cumulative_buildout_years(output_dir)
+    current_first_projection_year = _first_public_report_projection_year(
+        current_modeled_years,
+        current_starting_stock_year,
+    )
+    current_terminal_year = current_modeled_years[-1] if current_modeled_years else None
+    current_buildout_horizon_years = (
+        current_terminal_year - current_starting_stock_year
+        if current_terminal_year is not None and current_starting_stock_year is not None
+        else None
+    )
+    if len(starting_stock_fields) == 1:
+        current_starting_stock_source = f"execution-grid baseline field {starting_stock_fields[0]}"
+    elif starting_stock_fields:
+        current_starting_stock_source = "execution-grid baseline fields " + ", ".join(
+            starting_stock_fields
+        )
+    else:
+        current_starting_stock_source = None
+
+    report_reference = {
+        "starting_stock_year": PUBLIC_REPORT_BUNDLE_REPORT_BASELINE_YEAR,
+        "starting_stock_source": PUBLIC_REPORT_REFERENCE_INITIAL_LOCATIONS,
+        "modeled_years": list(PUBLIC_REPORT_REFERENCE_MODELED_YEARS),
+        "first_projection_year": _first_public_report_projection_year(
+            PUBLIC_REPORT_REFERENCE_MODELED_YEARS,
+            PUBLIC_REPORT_BUNDLE_REPORT_BASELINE_YEAR,
+        ),
+        "terminal_year": PUBLIC_REPORT_REFERENCE_TERMINAL_YEAR,
+        "buildout_horizon_years": PUBLIC_REPORT_REFERENCE_BUILDOUT_HORIZON_YEARS,
+    }
+    current_bundle = {
+        "starting_stock_year": current_starting_stock_year,
+        "starting_stock_fields": starting_stock_fields,
+        "starting_stock_source": current_starting_stock_source,
+        "baseline_years_from_configs": baseline_years,
+        "modeled_years": current_modeled_years,
+        "first_projection_year": current_first_projection_year,
+        "terminal_year": current_terminal_year,
+        "buildout_horizon_years": current_buildout_horizon_years,
+    }
+    alignment_checks = {
+        "starting_stock_year_matches": current_starting_stock_year
+        == report_reference["starting_stock_year"],
+        "starting_stock_source_matches": current_starting_stock_source
+        == report_reference["starting_stock_source"],
+        "terminal_year_matches": current_terminal_year == report_reference["terminal_year"],
+        "buildout_horizon_matches": current_buildout_horizon_years
+        == report_reference["buildout_horizon_years"],
+        "modeled_years_match": current_modeled_years == report_reference["modeled_years"],
+    }
+    blocker_names = {
+        "starting_stock_year_matches": "starting_stock_year_mismatch",
+        "starting_stock_source_matches": "starting_stock_source_mismatch",
+        "terminal_year_matches": "terminal_year_mismatch",
+        "buildout_horizon_matches": "buildout_horizon_mismatch",
+        "modeled_years_match": "modeled_years_mismatch",
+    }
+    parity_blockers = [
+        blocker_names[name]
+        for name, passed in alignment_checks.items()
+        if not passed
+    ]
+    return {
+        "contract_type": "report-parity-temporal-assumption-contract",
+        "report_reference": report_reference,
+        "current_bundle": current_bundle,
+        "alignment_checks": alignment_checks,
+        "parity_status": "aligned" if not parity_blockers else "blocked",
+        "parity_blockers": parity_blockers,
+        "implementation_decision": (
+            "Encode the report-parity temporal contract as metadata only; do not change current "
+            "bounded buildout behavior until the 2025 starting-stock source and modeled-year "
+            "contract can be validated."
+        ),
+    }
+
+
 def _build_public_report_assumption_registry(repo_root, output_dir):
     """Build the machine-readable assumption registry for the bounded public report bundle."""
     repo_root = Path(repo_root).resolve()
     smoke_configs = _load_public_report_bundle_smoke_configs(repo_root)
     output_labels = _build_public_report_output_labels(output_dir)
+    temporal_assumptions = _build_public_report_temporal_assumptions(
+        repo_root,
+        output_dir,
+        smoke_configs=smoke_configs,
+    )
+    capacity_constraint_assumptions = _build_public_report_capacity_constraint_assumptions(
+        smoke_configs
+    )
     return {
         "registry_type": "bounded-public-report-assumption-registry",
         "bundle_label": "bounded-public-report-bundle",
@@ -5363,10 +5894,13 @@ def _build_public_report_assumption_registry(repo_root, output_dir):
         "bundle_mode": "bounded-public-approximation",
         "report_reference": {
             "baseline_year": PUBLIC_REPORT_BUNDLE_REPORT_BASELINE_YEAR,
+            "modeled_years": list(PUBLIC_REPORT_REFERENCE_MODELED_YEARS),
+            "buildout_horizon_years": PUBLIC_REPORT_REFERENCE_BUILDOUT_HORIZON_YEARS,
+            "terminal_year": PUBLIC_REPORT_REFERENCE_TERMINAL_YEAR,
             "grid_resolution_km": PUBLIC_REPORT_REFERENCE_GRID_RESOLUTION_KM,
             "utilization_factor": PUBLIC_REPORT_REFERENCE_UTILIZATION_FACTOR,
             "initial_locations": PUBLIC_REPORT_REFERENCE_INITIAL_LOCATIONS,
-            "max_site_addition_per_time_step_mw": 1000,
+            "max_site_addition_per_time_step_mw": PUBLIC_REPORT_REFERENCE_MAX_SITE_ADDITION_PER_TIME_STEP_MW,
         },
         "current_bundle": {
             "baseline_year": PUBLIC_REPORT_BUNDLE_BASELINE_YEAR,
@@ -5383,20 +5917,43 @@ def _build_public_report_assumption_registry(repo_root, output_dir):
             _build_public_report_scenario_input(output_label, config_path, config)
             for output_label, config_path, config in smoke_configs
         ],
+        "temporal_assumptions": temporal_assumptions,
+        "capacity_constraint_assumptions": capacity_constraint_assumptions,
         "output_labels": output_labels,
         "limitation_carry_forward": [dict(entry) for entry in PUBLIC_REPORT_LIMITATION_ENTRIES],
         "assumption_gaps": [
             {
                 "name": "report_reference_utilization_factor",
                 "report_reference_value": PUBLIC_REPORT_REFERENCE_UTILIZATION_FACTOR,
-                "current_bundle_value": None,
-                "status": "not-explicitly-modeled-in-current-bundle",
+                "current_bundle_value": capacity_constraint_assumptions["current_bundle"][
+                    "utilization_factors"
+                ],
+                "status": "configured-in-current-bundle"
+                if capacity_constraint_assumptions["alignment_checks"]["utilization_factor_matches"]
+                else "mismatch",
+            },
+            {
+                "name": "report_reference_per_site_capacity_constraint",
+                "report_reference_value": PUBLIC_REPORT_REFERENCE_MAX_SITE_ADDITION_PER_TIME_STEP_MW,
+                "current_bundle_value": capacity_constraint_assumptions["current_bundle"][
+                    "max_site_addition_per_time_step_mw"
+                ],
+                "status": "configured-in-current-bundle"
+                if capacity_constraint_assumptions["alignment_checks"]["per_time_step_limit_matches"]
+                else "mismatch",
             },
             {
                 "name": "report_reference_initial_locations",
                 "report_reference_value": PUBLIC_REPORT_REFERENCE_INITIAL_LOCATIONS,
                 "current_bundle_value": "execution-grid baseline field dc_capacity_mw_existing with 2022 baseline year",
                 "status": "bounded-approximation",
+            },
+            {
+                "name": "report_reference_temporal_assumptions",
+                "report_reference_value": temporal_assumptions["report_reference"],
+                "current_bundle_value": temporal_assumptions["current_bundle"],
+                "status": temporal_assumptions["parity_status"],
+                "parity_blockers": temporal_assumptions["parity_blockers"],
             },
             {
                 "name": "report_reference_grid_resolution_km",
@@ -7439,12 +7996,23 @@ def _build_public_report_reeds_handoff_products(output_dir):
                 "baseline_total_dc_load_mw",
                 "cumulative_new_dc_load_mw",
                 "cumulative_total_dc_load_mw",
+                "new_dc_capacity_mw",
+                "baseline_total_dc_capacity_mw",
+                "cumulative_new_dc_capacity_mw",
+                "cumulative_total_dc_capacity_mw",
+                "utilization_factor",
+                "max_site_addition_per_time_step_mw",
+                "per_site_time_step_capacity_limit_exceeded",
                 "geometry",
             ],
             "units": {
                 "baseline_total_dc_load_mw": "MW",
                 "cumulative_new_dc_load_mw": "MW",
                 "cumulative_total_dc_load_mw": "MW",
+                "new_dc_capacity_mw": "MW",
+                "baseline_total_dc_capacity_mw": "MW",
+                "cumulative_new_dc_capacity_mw": "MW",
+                "cumulative_total_dc_capacity_mw": "MW",
             },
             "primary_join_keys": ["sc_point_gid", "year"],
         },
@@ -7460,12 +8028,23 @@ def _build_public_report_reeds_handoff_products(output_dir):
                 "baseline_total_dc_load_mw",
                 "cumulative_new_dc_load_mw",
                 "cumulative_total_dc_load_mw",
+                "new_dc_capacity_mw",
+                "baseline_total_dc_capacity_mw",
+                "cumulative_new_dc_capacity_mw",
+                "cumulative_total_dc_capacity_mw",
+                "utilization_factor",
+                "max_site_addition_per_time_step_mw",
+                "per_site_time_step_capacity_limit_exceeded",
                 "geometry",
             ],
             "units": {
                 "baseline_total_dc_load_mw": "MW",
                 "cumulative_new_dc_load_mw": "MW",
                 "cumulative_total_dc_load_mw": "MW",
+                "new_dc_capacity_mw": "MW",
+                "baseline_total_dc_capacity_mw": "MW",
+                "cumulative_new_dc_capacity_mw": "MW",
+                "cumulative_total_dc_capacity_mw": "MW",
             },
             "primary_join_keys": ["zone_group", "sc_point_gid", "year"],
         },
@@ -7481,11 +8060,20 @@ def _build_public_report_reeds_handoff_products(output_dir):
                 "baseline_total_dc_load_mw",
                 "cumulative_new_dc_load_mw",
                 "cumulative_total_dc_load_mw",
+                "baseline_total_dc_capacity_mw",
+                "cumulative_new_dc_capacity_mw",
+                "cumulative_total_dc_capacity_mw",
+                "max_new_dc_capacity_mw",
+                "per_site_time_step_capacity_limit_exceeded",
             ],
             "units": {
                 "baseline_total_dc_load_mw": "MW",
                 "cumulative_new_dc_load_mw": "MW",
                 "cumulative_total_dc_load_mw": "MW",
+                "baseline_total_dc_capacity_mw": "MW",
+                "cumulative_new_dc_capacity_mw": "MW",
+                "cumulative_total_dc_capacity_mw": "MW",
+                "max_new_dc_capacity_mw": "MW",
             },
             "primary_join_keys": ["source_output_name", "year"],
         },
@@ -7554,6 +8142,7 @@ def _build_public_report_reeds_validation_checks(output_dir, handoff_products):
     regional_years = []
     summary_years = []
     summary_source_names = []
+    capacity_limit_violations = 0
     total_path = output_dir / "public_eer_total_downscaled_cumulative_buildout.gpkg"
     regional_path = output_dir / "public_eer_regional_downscaled_cumulative_buildout.gpkg"
     summary_path = output_dir / "public_report_bundle_cumulative_buildout_summary.csv"
@@ -7566,6 +8155,10 @@ def _build_public_report_reeds_validation_checks(output_dir, handoff_products):
         summary = pd.read_csv(summary_path)
         summary_years = sorted(int(year) for year in summary["year"].dropna().unique())
         summary_source_names = sorted(summary["source_output_name"].dropna().unique().tolist())
+        if "per_site_time_step_capacity_limit_exceeded" in summary.columns:
+            capacity_limit_violations = int(
+                summary["per_site_time_step_capacity_limit_exceeded"].fillna(0).sum()
+            )
 
     expected_source_names = [
         "public_eer_regional_downscaled",
@@ -7590,6 +8183,15 @@ def _build_public_report_reeds_validation_checks(output_dir, handoff_products):
         }
     )
 
+    checks.append(
+        {
+            "name": "per_site_time_step_capacity_limit",
+            "status": "passed" if capacity_limit_violations == 0 else "failed",
+            "detail": "No generated cumulative buildout row exceeds the configured per-site time-step capacity limit.",
+            "violation_count": capacity_limit_violations,
+        }
+    )
+
     return checks
 
 
@@ -7600,6 +8202,10 @@ def _build_public_report_reeds_integration_contract(repo_root, output_dir):
     summary_path = output_dir / "public_report_bundle_cumulative_buildout_summary.csv"
     summary = pd.read_csv(summary_path)
     modeled_years = sorted(int(year) for year in summary["year"].dropna().unique())
+    temporal_assumptions = _build_public_report_temporal_assumptions(repo_root, output_dir)
+    capacity_constraint_assumptions = _build_public_report_capacity_constraint_assumptions(
+        _load_public_report_bundle_smoke_configs(repo_root)
+    )
 
     handoff_products = _build_public_report_reeds_handoff_products(output_dir)
     validation_checks = _build_public_report_reeds_validation_checks(output_dir, handoff_products)
@@ -7615,7 +8221,39 @@ def _build_public_report_reeds_integration_contract(repo_root, output_dir):
             "current_bundle_baseline_year": PUBLIC_REPORT_BUNDLE_BASELINE_YEAR,
             "report_reference_baseline_year": PUBLIC_REPORT_BUNDLE_REPORT_BASELINE_YEAR,
             "modeled_years": modeled_years,
+            "report_reference_modeled_years": temporal_assumptions["report_reference"]["modeled_years"],
+            "current_bundle_starting_stock_year": temporal_assumptions["current_bundle"][
+                "starting_stock_year"
+            ],
+            "report_reference_starting_stock_year": temporal_assumptions["report_reference"][
+                "starting_stock_year"
+            ],
+            "current_bundle_starting_stock_source": temporal_assumptions["current_bundle"][
+                "starting_stock_source"
+            ],
+            "report_reference_starting_stock_source": temporal_assumptions["report_reference"][
+                "starting_stock_source"
+            ],
+            "current_bundle_buildout_horizon_years": temporal_assumptions["current_bundle"][
+                "buildout_horizon_years"
+            ],
+            "report_reference_buildout_horizon_years": temporal_assumptions["report_reference"][
+                "buildout_horizon_years"
+            ],
+            "temporal_parity_status": temporal_assumptions["parity_status"],
+            "temporal_parity_blockers": temporal_assumptions["parity_blockers"],
             "cumulative_buildout_interpretation": "Each annual record represents bounded cumulative total load and bounded cumulative new load by grid cell.",
+        },
+        "capacity_constraint_contract": {
+            "utilization_factor": PUBLIC_REPORT_REFERENCE_UTILIZATION_FACTOR,
+            "max_site_addition_per_time_step_mw": PUBLIC_REPORT_REFERENCE_MAX_SITE_ADDITION_PER_TIME_STEP_MW,
+            "load_to_capacity_rule": "capacity_mw = load_mw / utilization_factor",
+            "current_bundle_capacity_assumptions": capacity_constraint_assumptions["current_bundle"],
+            "per_site_time_step_capacity_validation_status": next(
+                check["status"]
+                for check in validation_checks
+                if check["name"] == "per_site_time_step_capacity_limit"
+            ),
         },
         "spatial_contract": {
             "grid_cell_key": "sc_point_gid",
@@ -7658,7 +8296,18 @@ def _select_public_buildout_cell_key(frame):
     raise ValueError("Buildout frame must include either sc_point_gid or gid")
 
 
-def _build_public_cumulative_buildout_frame(frame):
+def _public_report_bundle_config_by_output(repo_root):
+    return {
+        output_label: config
+        for output_label, _, config in _load_public_report_bundle_smoke_configs(repo_root)
+    }
+
+
+def _build_public_cumulative_buildout_frame(
+    frame,
+    utilization_factor=1.0,
+    max_site_addition_per_time_step_mw=None,
+):
     """Add cumulative buildout columns using existing load plus cumulative new additions by cell."""
     required_columns = {"year", "new_dc_load_mw", "total_dc_load_mw"}
     missing_columns = sorted(required_columns.difference(frame.columns))
@@ -7676,6 +8325,28 @@ def _build_public_cumulative_buildout_frame(frame):
     frame["cumulative_total_dc_load_mw"] = (
         frame["baseline_total_dc_load_mw"] + frame["cumulative_new_dc_load_mw"]
     )
+
+    utilization_factor = float(utilization_factor or 1.0)
+    if utilization_factor <= 0 or utilization_factor > 1:
+        raise ValueError("utilization_factor must be greater than 0 and no greater than 1")
+    frame["utilization_factor"] = utilization_factor
+    frame["new_dc_capacity_mw"] = frame["new_dc_load_mw"] / utilization_factor
+    frame["baseline_total_dc_capacity_mw"] = (
+        frame["baseline_total_dc_load_mw"] / utilization_factor
+    )
+    frame["cumulative_new_dc_capacity_mw"] = (
+        frame["cumulative_new_dc_load_mw"] / utilization_factor
+    )
+    frame["cumulative_total_dc_capacity_mw"] = (
+        frame["cumulative_total_dc_load_mw"] / utilization_factor
+    )
+    frame["max_site_addition_per_time_step_mw"] = max_site_addition_per_time_step_mw
+    if max_site_addition_per_time_step_mw is None:
+        frame["per_site_time_step_capacity_limit_exceeded"] = False
+    else:
+        frame["per_site_time_step_capacity_limit_exceeded"] = (
+            frame["new_dc_capacity_mw"] > float(max_site_addition_per_time_step_mw) + 1e-6
+        )
 
     if not np.allclose(
         frame["cumulative_total_dc_load_mw"],
@@ -7700,6 +8371,14 @@ def _build_public_cumulative_buildout_summary(frame, source_output_name):
             baseline_total_dc_load_mw=("baseline_total_dc_load_mw", "sum"),
             cumulative_new_dc_load_mw=("cumulative_new_dc_load_mw", "sum"),
             cumulative_total_dc_load_mw=("cumulative_total_dc_load_mw", "sum"),
+            baseline_total_dc_capacity_mw=("baseline_total_dc_capacity_mw", "sum"),
+            cumulative_new_dc_capacity_mw=("cumulative_new_dc_capacity_mw", "sum"),
+            cumulative_total_dc_capacity_mw=("cumulative_total_dc_capacity_mw", "sum"),
+            max_new_dc_capacity_mw=("new_dc_capacity_mw", "max"),
+            per_site_time_step_capacity_limit_exceeded=(
+                "per_site_time_step_capacity_limit_exceeded",
+                "sum",
+            ),
         )
         .reset_index()
         .sort_values("year")
@@ -7811,6 +8490,7 @@ def _write_public_report_bundle_deviations(repo_root, output_dir):
 
 
 def _write_public_report_bundle_cumulative_buildout(
+    repo_root,
     output_dir,
     reproduction_status_path,
     bundle_status_path=None,
@@ -7824,6 +8504,7 @@ def _write_public_report_bundle_cumulative_buildout(
     )
     reproduction_status = json.loads(reproduction_status_path.read_text())
     step_results = reproduction_status.get("step_results", {})
+    config_by_output = _public_report_bundle_config_by_output(repo_root)
 
     cumulative_output_paths = []
     summary_frames = []
@@ -7836,7 +8517,14 @@ def _write_public_report_bundle_cumulative_buildout(
             continue
 
         source_path = Path(output_path)
-        buildout_frame = _build_public_cumulative_buildout_frame(gpd.read_file(source_path))
+        source_config = config_by_output.get(source_path.stem, {})
+        buildout_frame = _build_public_cumulative_buildout_frame(
+            gpd.read_file(source_path),
+            utilization_factor=source_config.get("utilization_factor", 1.0),
+            max_site_addition_per_time_step_mw=source_config.get(
+                "max_site_addition_per_time_step"
+            ),
+        )
         cumulative_path = output_dir / f"{source_path.stem}_cumulative_buildout.gpkg"
         buildout_frame.to_file(cumulative_path, driver="GPKG")
         cumulative_output_paths.append(cumulative_path.as_posix())
@@ -7875,17 +8563,32 @@ def _write_public_report_bundle_grid_surfaces(repo_root, output_dir, use_census_
         suitability_base,
         census_geographies=census_geographies,
     )
-    suitability_path = output_dir / "public_report_suitability_percentiles.gpkg"
-    suitability.to_file(suitability_path, driver="GPKG")
-
-    ranked_suitability = _build_public_report_ranked_suitability_summary(suitability)
-    ranked_suitability_path = output_dir / "public_report_suitability_ranked_cells.csv"
-    ranked_suitability.to_csv(ranked_suitability_path, index=False)
-
     state_boundaries, state_boundary_path = _write_public_report_state_boundaries(
         output_dir,
         suitability,
     )
+    ranked_suitability = _build_public_report_ranked_suitability_summary(suitability)
+    census_miss_frame = _build_public_report_census_geolookup_miss_frame(
+        ranked_suitability,
+        state_boundaries,
+    )
+    suitability = _apply_public_report_census_miss_classification(suitability, census_miss_frame)
+    ranked_suitability = _apply_public_report_census_miss_classification(
+        ranked_suitability,
+        census_miss_frame,
+    )
+    census_miss_outputs = _write_public_report_census_geolookup_miss_artifacts(
+        output_dir,
+        ranked_suitability,
+        census_miss_frame,
+    )
+
+    suitability_path = output_dir / "public_report_suitability_percentiles.gpkg"
+    suitability.to_file(suitability_path, driver="GPKG")
+
+    ranked_suitability_path = output_dir / "public_report_suitability_ranked_cells.csv"
+    ranked_suitability.to_csv(ranked_suitability_path, index=False)
+
     zoning_proxy, zoning_proxy_path = _write_public_report_zoning_proxy(
         output_dir,
         repo_root,
@@ -7924,6 +8627,7 @@ def _write_public_report_bundle_grid_surfaces(repo_root, output_dir, use_census_
             feasible_land_path.as_posix(),
             suitability_path.as_posix(),
             ranked_suitability_path.as_posix(),
+            *census_miss_outputs["outputs"],
             state_boundary_path.as_posix(),
             zoning_proxy_path.as_posix(),
             permitting_proxy_path.as_posix(),
@@ -7982,6 +8686,7 @@ def run_public_report_bundle(
         {
             "step_id": "write_cumulative_buildout",
             "runner": lambda: _write_public_report_bundle_cumulative_buildout(
+                repo_root,
                 output_dir,
                 reproduction_status_path,
                 bundle_status_path=bundle_status_path,

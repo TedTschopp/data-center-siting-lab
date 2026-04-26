@@ -70,6 +70,13 @@ class BaseDownscaleConfig(BaseGridConfig):
         Optional[float],
         Field(strict=False, gt=0.0, default=None, validate_default=False),
     ]
+    max_site_addition_per_time_step: Annotated[
+        Optional[float],
+        Field(strict=False, gt=0.0, default=None, validate_default=False),
+    ]
+    utilization_factor: Annotated[
+        Optional[float], Field(strict=False, gt=0.0, le=1.0, default=1.0)
+    ]
     site_saturation_limit: Annotated[
         Optional[float], Field(strict=False, gt=0.0, le=1.0, default=1.0)
     ]
