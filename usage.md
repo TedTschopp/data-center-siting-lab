@@ -226,6 +226,11 @@ bundle directory with:
 - `external-data/derived/report-bundle/public_report_feasible_land.gpkg`
 - `external-data/derived/report-bundle/public_report_suitability_percentiles.gpkg`
 - `external-data/derived/report-bundle/public_report_suitability_ranked_cells.csv`
+- `external-data/derived/report-bundle/public_report_state_boundaries.gpkg`
+- `external-data/derived/report-bundle/public_report_zoning_proxy.gpkg`
+- `external-data/derived/report-bundle/public_report_permitting_proxy.gpkg`
+- `external-data/derived/report-bundle/public_report_social_friction_proxy.gpkg`
+- `external-data/derived/report-bundle/public_report_hosting_capacity_proxy.gpkg`
 - `external-data/derived/report-bundle/public_report_suitability_map.html`
 - `external-data/derived/report-bundle/public_report_assumption_registry.json`
 - `external-data/derived/report-bundle/public_report_limitations.md`
@@ -243,34 +248,34 @@ Behavior:
 - Resume it with `--resume` and the same `--output-dir` or `--status-path`.
 - Use `--force` to discard the existing bundle metadata and restart.
 - The manifest records the current repo-root outputs, baseline-year boundary, and
-	the grid-priority assumption used by the bounded public bundle.
+  the grid-priority assumption used by the bounded public bundle.
 - The feasible-land GeoPackage is a bounded approximation built from execution-grid
-	cells where `developable_capacity_mw > 0`.
+  cells where `developable_capacity_mw > 0`; cells whose staged NLCD water/wetland
+  share is at least `0.5` are retained and flagged rather than removed.
 - The suitability-percentile GeoPackage ranks the pre-existing
-	`suitability_score` field across those bounded feasible cells.
+  `suitability_score` field across developable cells, then clamps flagged
+  water/wetland cells to `0` suitability percentile.
 - The ranked suitability CSV orders those feasible cells nationwide by percentile,
-	score, and developable capacity so the bundle has a report-facing scored table as
-	well as map layers.
-- The D3 map HTML page embeds the bounded feasible-land and suitability surfaces in
-	a single browser-rendered file so you can inspect the map without opening GIS
-	software. The underlying grid remains the internal model, but the browser display
-	draws grid-backed cells as fitted hexagons for quicker visual scanning.
+  score, and developable capacity so the bundle has a report-facing scored table as
+  well as map layers. Cell labels now carry a bounded geographic identity stack:
+  stable unique `cell_name` values for joins, `local_cell_name` for the most
+  specific available place identity, `general_american_cell_name` for report-facing
+  recognition, and `identity_stack_json` for the ordered identity layers.
+- The D3 map HTML page embeds the bounded feasible-land and suitability surfaces in a single browser-rendered file so you can inspect the map without opening GIS software. The underlying grid remains the internal model, but the browser display draws grid-backed cells as fitted hexagons for quicker visual scanning. Water/wetland-flagged cells remain in the map footprint at `0` suitability percentile. Optional state-boundary, zoning-proxy, permitting / ordinance evidence, social-friction evidence, and hosting-capacity proxy layers provide bounded context overlays without replacing the base suitability surface.
 - The assumption registry JSON records the current scenario inputs, report-reference
-	assumptions, bounded bundle rules, output labels, and explicit assumption gaps so
-	future report runs can be compared consistently.
-- The limitations note carries forward the named LinkedIn refinement gaps such as
-	local transmission hosting capacity, demand queue times, zoning, permitting,
-	capacity scaling, and social acceptance so the bundle does not imply full siting
-	fidelity.
+  assumptions, bounded bundle rules, output labels, and explicit assumption gaps so
+  future report runs can be compared consistently.
+- The limitations note carries forward the named LinkedIn refinement gaps such as local transmission hosting capacity, demand queue times, zoning, permitting, capacity scaling, and social acceptance so the bundle does not imply full siting fidelity. Zoning, permitting, social friction, and hosting now have bounded proxy layers, but the note keeps the limits explicit so proxy evidence is not misread as entitlement, permit readiness, social acceptance, or local interconnection feasibility.
 - The ReEDS integration contract JSON defines the current handoff products,
-	required columns, annual time assumptions, spatial keys, and validation checks
-	for using the bounded bundle in ReEDS-facing workflows.
+  required columns, annual time assumptions, spatial keys, and validation checks
+  for using the bounded bundle in ReEDS-facing workflows.
 - The cumulative buildout GeoPackages add `baseline_total_dc_load_mw`,
-	`cumulative_new_dc_load_mw`, and `cumulative_total_dc_load_mw` so the bundle can
-	support cumulative buildout maps or downstream animation prep from the existing
-	time-stepped smoke outputs.
+  `cumulative_new_dc_load_mw`, and `cumulative_total_dc_load_mw` so the bundle can
+  support cumulative buildout maps or downstream animation prep from the existing
+  time-stepped smoke outputs.
 - The deviation note is intentionally explicit: this is a bounded public
-	approximation, not a report-equivalent reproduction.
+  approximation, not a report-equivalent reproduction.
+- Version-control policy: treat these report-bundle outputs as regenerated local deliverables. Commit the source code, tests, small input manifests, provenance, and documentation that recreate them; do not commit the generated HTML, GeoPackage, JSON, CSV, Markdown, or cache payloads under the bundle output directory.
 
 ### 8. Run the checkpointed public example workflows
 

@@ -79,10 +79,116 @@ PUBLIC_NLCD_WMS_INDEX_TO_CLASS = {
     16: 95,
 }
 PUBLIC_REPORT_CELL_NAME_POPULARITY_RULE = (
-    "Select the highest-popularity metro candidate and the highest-popularity natural or monument candidate for each cell; "
-    "prefer in-cell catalog matches, fall back to the nearest catalog entry for a class when a cell has no in-cell match, "
-    "then choose the higher-popularity class winner as the final cell name, breaking ties by centroid distance and then metro priority."
+    "Build a bounded offline geographic identity stack for each cell. Local labels use the most specific available "
+    "culturally meaningful layer; general-audience labels use the smallest broadly recognizable layer, moving up to "
+    "state or region when the nearest metro/city is too distant."
 )
+PUBLIC_REPORT_GENERAL_METRO_RADIUS_MILES = 125.0
+PUBLIC_REPORT_LANDMARK_RADIUS_MILES = 50.0
+PUBLIC_REPORT_STATE_NAME_BY_CODE = {
+    "AL": "Alabama",
+    "AK": "Alaska",
+    "AZ": "Arizona",
+    "AR": "Arkansas",
+    "CA": "California",
+    "CO": "Colorado",
+    "CT": "Connecticut",
+    "DE": "Delaware",
+    "FL": "Florida",
+    "GA": "Georgia",
+    "HI": "Hawaii",
+    "ID": "Idaho",
+    "IL": "Illinois",
+    "IN": "Indiana",
+    "IA": "Iowa",
+    "KS": "Kansas",
+    "KY": "Kentucky",
+    "LA": "Louisiana",
+    "ME": "Maine",
+    "MD": "Maryland",
+    "MA": "Massachusetts",
+    "MI": "Michigan",
+    "MN": "Minnesota",
+    "MS": "Mississippi",
+    "MO": "Missouri",
+    "MT": "Montana",
+    "NE": "Nebraska",
+    "NV": "Nevada",
+    "NH": "New Hampshire",
+    "NJ": "New Jersey",
+    "NM": "New Mexico",
+    "NY": "New York",
+    "NC": "North Carolina",
+    "ND": "North Dakota",
+    "OH": "Ohio",
+    "OK": "Oklahoma",
+    "OR": "Oregon",
+    "PA": "Pennsylvania",
+    "RI": "Rhode Island",
+    "SC": "South Carolina",
+    "SD": "South Dakota",
+    "TN": "Tennessee",
+    "TX": "Texas",
+    "UT": "Utah",
+    "VT": "Vermont",
+    "VA": "Virginia",
+    "WA": "Washington",
+    "WV": "West Virginia",
+    "WI": "Wisconsin",
+    "WY": "Wyoming",
+    "DC": "District of Columbia",
+}
+PUBLIC_REPORT_NATIONAL_REGION_BY_STATE = {
+    "CA": "West Coast",
+    "OR": "West Coast",
+    "WA": "West Coast",
+    "AZ": "Southwest",
+    "NM": "Southwest",
+    "NV": "Southwest",
+    "UT": "Mountain West",
+    "CO": "Mountain West",
+    "ID": "Mountain West",
+    "MT": "Mountain West",
+    "WY": "Mountain West",
+    "TX": "South Central United States",
+    "OK": "South Central United States",
+    "AR": "South Central United States",
+    "LA": "Gulf Coast",
+    "MS": "Gulf Coast",
+    "AL": "Gulf Coast",
+    "FL": "Southeast",
+    "GA": "Southeast",
+    "SC": "Southeast",
+    "NC": "Southeast",
+    "TN": "Southeast",
+    "KY": "Southeast",
+    "VA": "Mid-Atlantic",
+    "WV": "Appalachia",
+    "MD": "Mid-Atlantic",
+    "DE": "Mid-Atlantic",
+    "DC": "Mid-Atlantic",
+    "PA": "Mid-Atlantic",
+    "NJ": "Mid-Atlantic",
+    "NY": "Northeast",
+    "CT": "Northeast",
+    "RI": "Northeast",
+    "MA": "Northeast",
+    "VT": "Northeast",
+    "NH": "Northeast",
+    "ME": "Northeast",
+    "OH": "Midwest",
+    "MI": "Midwest",
+    "IN": "Midwest",
+    "IL": "Midwest",
+    "WI": "Midwest",
+    "MN": "Midwest",
+    "IA": "Midwest",
+    "MO": "Midwest",
+    "KS": "Great Plains",
+    "NE": "Great Plains",
+    "SD": "Great Plains",
+    "ND": "Great Plains",
+}
 PUBLIC_REPORT_CELL_NAME_CATALOG = (
     {"name": "New York City", "kind": "metro", "latitude": 40.7128, "longitude": -74.0060, "popularity_score": 100.0},
     {"name": "Los Angeles", "kind": "metro", "latitude": 34.0522, "longitude": -118.2437, "popularity_score": 98.0},
@@ -272,9 +378,9 @@ PUBLIC_REPORT_LIMITATION_ENTRIES = (
     {
         "name": "permitting_and_ordinance_information",
         "title": "Permitting and ordinance information",
-        "status": "not implemented",
-        "current_posture": "The current bundle does not model local permitting pathways or ordinance restrictions.",
-        "output_implication": "Report outputs do not imply permit readiness or ordinance compatibility.",
+        "status": "bounded proxy",
+        "current_posture": "The current bundle stages a manifest-driven public permitting and ordinance evidence overlay, but it does not model permit approval likelihood or ordinance compatibility.",
+        "output_implication": "The permitting overlay surfaces manually curated public evidence signals only; it does not confirm permit readiness or entitlement feasibility.",
     },
     {
         "name": "capacity_scaling_by_market_trends",
@@ -286,9 +392,9 @@ PUBLIC_REPORT_LIMITATION_ENTRIES = (
     {
         "name": "social_acceptance",
         "title": "Social acceptance",
-        "status": "not implemented",
-        "current_posture": "The current bundle does not model community acceptance, local opposition, or related siting friction.",
-        "output_implication": "Ranked outputs do not account for local acceptance risk.",
+        "status": "bounded proxy",
+        "current_posture": "The current bundle stages a manifest-driven public social-friction evidence overlay, but it does not model community acceptance or social license to operate.",
+        "output_implication": "The social-friction overlay surfaces manually curated public evidence signals only; it does not measure actual community acceptance or opposition intensity.",
     },
 )
 PUBLIC_REPORT_ZONING_PROXY_NLCD_LABELS = {
@@ -298,6 +404,62 @@ PUBLIC_REPORT_ZONING_PROXY_NLCD_LABELS = {
     24: "Developed, High Intensity",
 }
 PUBLIC_REPORT_ZONING_PROXY_DEVELOPED_CLASSES = tuple(PUBLIC_REPORT_ZONING_PROXY_NLCD_LABELS)
+PUBLIC_REPORT_PERMITTING_EVIDENCE_MANIFEST_PATH = (
+    "external-data/manifest/permitting-ordinance-evidence.csv"
+)
+PUBLIC_REPORT_PERMITTING_EVIDENCE_COLUMNS = (
+    "evidence_id",
+    "jurisdiction_name",
+    "state",
+    "evidence_type",
+    "friction_level",
+    "latitude",
+    "longitude",
+    "source_url",
+    "source_date",
+    "summary",
+)
+PUBLIC_REPORT_PERMITTING_RESTRICTIVE_TYPES = {
+    "moratorium",
+    "ordinance_restriction",
+}
+PUBLIC_REPORT_PERMITTING_FRICTION_TYPES = {
+    "local_opposition",
+    "planning_board_signal",
+    "public_hearing_outcome",
+}
+PUBLIC_REPORT_PERMITTING_RESTRICTIVE_LEVELS = {"high", "restrictive"}
+PUBLIC_REPORT_PERMITTING_FRICTION_LEVELS = {"medium", "moderate"}
+PUBLIC_REPORT_SOCIAL_FRICTION_EVIDENCE_MANIFEST_PATH = (
+    "external-data/manifest/social-friction-evidence.csv"
+)
+PUBLIC_REPORT_SOCIAL_FRICTION_EVIDENCE_COLUMNS = (
+    "evidence_id",
+    "community_name",
+    "state",
+    "evidence_type",
+    "friction_level",
+    "latitude",
+    "longitude",
+    "source_url",
+    "source_date",
+    "summary",
+)
+PUBLIC_REPORT_SOCIAL_FRICTION_OPPOSITION_TYPES = {
+    "appeal",
+    "lawsuit",
+    "news_documented_conflict",
+    "organized_opposition",
+    "petition",
+}
+PUBLIC_REPORT_SOCIAL_FRICTION_CONCERN_TYPES = {
+    "civic_org_objection",
+    "local_opposition_record",
+    "public_hearing_concern",
+    "public_meeting_concern",
+}
+PUBLIC_REPORT_SOCIAL_FRICTION_OPPOSITION_LEVELS = {"high", "organized", "opposition"}
+PUBLIC_REPORT_SOCIAL_FRICTION_CONCERN_LEVELS = {"medium", "moderate", "concern"}
 PUBLIC_REPORT_NLCD_WATER_WETLAND_CLASSES = (11, 90, 95)
 PUBLIC_REPORT_NLCD_WATER_WETLAND_EXCLUSION_THRESHOLD = 0.5
 MMBTU_PER_YEAR_TO_AVERAGE_MW = 0.29307107 / 8760
@@ -3803,6 +3965,42 @@ def _default_public_report_bundle_reproduction_status_path(output_dir):
     return Path(output_dir) / "public_reproduction_status.json"
 
 
+def _write_public_report_bundle_readme(output_dir):
+    """Write the local-output policy README for the generated report bundle."""
+    output_dir = Path(output_dir)
+    readme_path = output_dir / "README.md"
+    readme_path.write_text(
+        "\n".join(
+            [
+                "# Bounded Public Report Bundle Outputs",
+                "",
+                "This directory is the local output target for:",
+                "",
+                "```bash",
+                "python -m reVeal.public_data run-public-report-bundle \\",
+                "  --output-dir external-data/derived/report-bundle",
+                "```",
+                "",
+                "The generated bundle artifacts in this directory are intentionally not tracked in Git.",
+                "They are report deliverables, but they are regenerated deliverables.",
+                "",
+                "Track the durable inputs and recipes instead:",
+                "",
+                "- source code and regression tests",
+                "- schema-only public evidence manifests under `external-data/manifest/`",
+                "- provenance notes under `external-data/provenance/`",
+                "- user-facing usage and dataset documentation",
+                "",
+                "Regenerate the local bundle whenever you need the HTML map, GeoPackages, manifest,",
+                "status JSON, deviation note, ranked CSV, cumulative buildout surfaces, or cached",
+                "state-boundary source ZIP.",
+                "",
+            ]
+        )
+    )
+    return readme_path
+
+
 def _report_bundle_deviation_lines(repo_root):
     """Return the current bounded-public deviations from the published report."""
     repo_root = Path(repo_root).resolve()
@@ -3823,12 +4021,13 @@ def _report_bundle_deviation_lines(repo_root):
         ),
         (
             "- The current feasible-land artifact is a bounded approximation that keeps cells where "
-            "`developable_capacity_mw > 0` and excludes cells whose staged NLCD water/wetland share across classes "
-            "`11`, `90`, and `95` is at least `0.5`, rather than a reproduced exclusion stack from the report."
+            "`developable_capacity_mw > 0` and flags cells whose staged NLCD water/wetland share across classes "
+            "`11`, `90`, and `95` is at least `0.5`; flagged cells remain in the map but are clamped to "
+            "0 suitability percentile rather than removed, and this remains a bounded approximation rather than a reproduced exclusion stack from the report."
         ),
         (
-            "- The current suitability-percentile artifact ranks the pre-existing `suitability_score` field on those "
-            "bounded feasible cells, rather than a trained nationwide model surface."
+            "- The current suitability-percentile artifact ranks the pre-existing `suitability_score` field on "
+            "developable cells, then clamps water/wetland-excluded cells to 0 percentile rather than using a trained nationwide model surface."
         ),
         "- The current workflow validates downscaling mechanics and schema compatibility, not parity of learned weights or parity of nationwide siting predictions.",
     ]
@@ -3841,6 +4040,15 @@ def _load_public_report_bundle_grid(repo_root):
     return gpd.read_file(grid_path), grid_path
 
 
+def _coerce_public_report_bool(value):
+    """Coerce nullable report flags to plain booleans."""
+    if pd.isna(value):
+        return False
+    if isinstance(value, str):
+        return value.strip().lower() in {"1", "true", "yes"}
+    return bool(value)
+
+
 def _build_public_report_feasible_land_frame(repo_root, frame):
     """Build the bounded feasible-land layer from the current execution grid."""
     if "developable_capacity_mw" not in frame.columns:
@@ -3848,9 +4056,9 @@ def _build_public_report_feasible_land_frame(repo_root, frame):
 
     feasible = frame[frame["developable_capacity_mw"].fillna(0.0) > 0.0].copy()
     feasible = _annotate_public_report_nlcd_context_frame(repo_root, feasible)
-    exclusion_mask = feasible["water_wetland_excluded"].eq(True)
-    feasible = feasible.loc[~exclusion_mask].copy()
-    feasible["water_wetland_excluded"] = False
+    feasible["water_wetland_excluded"] = feasible["water_wetland_excluded"].map(
+        _coerce_public_report_bool
+    )
     feasible["is_feasible_land"] = True
     return feasible
 
@@ -3866,6 +4074,9 @@ def _build_public_report_suitability_percentile_frame(feasible_land):
     suitability.loc[valid_mask, "suitability_percentile"] = (
         _calc_percentile_rank(suitability.loc[valid_mask, "suitability_score"]) * 100.0
     ).round(6)
+    if "water_wetland_excluded" in suitability.columns:
+        exclusion_mask = suitability["water_wetland_excluded"].map(_coerce_public_report_bool)
+        suitability.loc[exclusion_mask, "suitability_percentile"] = 0.0
     return suitability
 
 
@@ -3927,6 +4138,7 @@ def _calculate_haversine_distance_miles(latitude_a, longitude_a, latitude_b, lon
         * math.cos(latitude_b)
         * math.sin(delta_longitude / 2.0) ** 2
     )
+    haversine = min(1.0, max(0.0, haversine))
     return 2.0 * earth_radius_miles * math.asin(math.sqrt(haversine))
 
 
@@ -3941,6 +4153,54 @@ def _calculate_bearing_degrees(latitude_a, longitude_a, latitude_b, longitude_b)
         - math.sin(latitude_a) * math.cos(latitude_b) * math.cos(delta_longitude)
     )
     return (math.degrees(math.atan2(y_value, x_value)) + 360.0) % 360.0
+
+
+def _clean_public_report_text(value):
+    """Return a stripped scalar string, or None for missing bounded identity values."""
+    if value is None or pd.isna(value):
+        return None
+    text = str(value).strip()
+    return text or None
+
+
+def _format_public_report_coordinate_label(latitude, longitude):
+    """Format a coordinate fallback for public report cell identity fields."""
+    return f"{float(latitude):.3f}, {float(longitude):.3f}"
+
+
+def _format_public_report_state_name(state_code):
+    """Return a display state name from an abbreviation or existing state label."""
+    state_text = _clean_public_report_text(state_code)
+    if state_text is None:
+        return None
+    return PUBLIC_REPORT_STATE_NAME_BY_CODE.get(state_text.upper(), state_text)
+
+
+def _select_public_report_state_region(latitude, longitude, state_code):
+    """Return a coarse state-region identity layer when the bounded data supports one."""
+    state_text = _clean_public_report_text(state_code)
+    if state_text is None:
+        return None
+    state_text = state_text.upper()
+    latitude = float(latitude)
+    longitude = float(longitude)
+    if state_text == "CA":
+        return "Southern California" if latitude < 36.5 else "Northern California"
+    if state_text == "TX" and latitude < 30.75 and longitude > -98.5:
+        return "Texas Gulf Coast"
+    if state_text in {"LA", "MS", "AL"} and latitude < 31.5:
+        return "Gulf Coast"
+    if state_text == "FL":
+        return "Florida Peninsula"
+    return None
+
+
+def _select_public_report_national_region(state_code):
+    """Return a broad national-region label from state-level identity."""
+    state_text = _clean_public_report_text(state_code)
+    if state_text is None:
+        return None
+    return PUBLIC_REPORT_NATIONAL_REGION_BY_STATE.get(state_text.upper())
 
 
 def _format_bearing_direction(bearing_degrees):
@@ -4060,6 +4320,7 @@ def _select_public_report_cell_name_candidate(
             "feature_name": None,
             "popularity_score": None,
             "distance_degrees": None,
+            "distance_miles": None,
             "match_scope": None,
             "kind": kind,
         }
@@ -4095,40 +4356,132 @@ def _select_public_report_cell_name_candidate(
         "feature_name": selected["name"],
         "popularity_score": float(selected["popularity_score"]),
         "distance_degrees": float(selected["distance_degrees"]),
+        "distance_miles": _calculate_haversine_distance_miles(
+            selected["latitude"],
+            selected["longitude"],
+            center_latitude,
+            center_longitude,
+        ),
         "match_scope": match_scope,
         "kind": kind,
     }
 
 
 def _select_public_report_cell_name_choice(metro_candidate, natural_candidate):
-    """Choose the final human-readable cell name from metro and natural candidates."""
-    candidates = [
-        candidate
-        for candidate in (metro_candidate, natural_candidate)
-        if candidate["feature_name"] is not None
-    ]
-    if not candidates:
+    """Choose the final human-readable cell name from the bounded label hierarchy."""
+    selected = None
+    if metro_candidate["feature_name"] is not None and metro_candidate["match_scope"] == "in_cell":
+        selected = metro_candidate
+    elif metro_candidate["feature_name"] is not None:
+        selected = metro_candidate
+    elif natural_candidate["feature_name"] is not None:
+        selected = natural_candidate
+
+    if selected is None:
         return {
             "cell_name": None,
             "cell_name_basis": None,
             "cell_name_popularity_score": None,
             "cell_name_match_scope": None,
         }
-
-    selected = sorted(
-        candidates,
-        key=lambda candidate: (
-            -candidate["popularity_score"],
-            candidate["distance_degrees"],
-            0 if candidate["kind"] == "metro" else 1,
-            candidate["feature_name"],
-        ),
-    )[0]
     return {
         "cell_name": selected["feature_name"],
         "cell_name_basis": selected["kind"],
         "cell_name_popularity_score": float(selected["popularity_score"]),
         "cell_name_match_scope": selected["match_scope"],
+    }
+
+
+def _build_public_report_identity_fields(
+    center_latitude,
+    center_longitude,
+    metro_candidate,
+    natural_candidate,
+    anchor_place,
+):
+    """Build local and general-audience identity layers from bounded offline inputs."""
+    exact_point = _format_public_report_coordinate_label(center_latitude, center_longitude)
+    anchor_name = _clean_public_report_text(anchor_place.get("anchor_place_name"))
+    anchor_county = _clean_public_report_text(anchor_place.get("anchor_place_county"))
+    anchor_state = _clean_public_report_text(anchor_place.get("anchor_place_state"))
+    state_name = _format_public_report_state_name(anchor_state)
+    state_region = _select_public_report_state_region(center_latitude, center_longitude, anchor_state)
+    national_region = _select_public_report_national_region(anchor_state)
+
+    metro_name = _clean_public_report_text(metro_candidate.get("feature_name"))
+    metro_distance_miles = metro_candidate.get("distance_miles")
+    natural_name = _clean_public_report_text(natural_candidate.get("feature_name"))
+    natural_distance_miles = natural_candidate.get("distance_miles")
+    landmark_name = None
+    if natural_name is not None and (
+        natural_candidate.get("match_scope") == "in_cell"
+        or (
+            natural_distance_miles is not None
+            and float(natural_distance_miles) <= PUBLIC_REPORT_LANDMARK_RADIUS_MILES
+        )
+    ):
+        landmark_name = natural_name
+
+    if anchor_name is not None:
+        local_name = anchor_name
+        local_layer = "city"
+    elif landmark_name is not None:
+        local_name = f"near {landmark_name}"
+        local_layer = "landmark_or_address"
+    elif anchor_county is not None:
+        local_name = anchor_county
+        local_layer = "county"
+    else:
+        local_name = exact_point
+        local_layer = "exact_point"
+
+    state_suffix = f", {state_name}" if state_name is not None else ""
+    if metro_name is not None and (
+        metro_candidate.get("match_scope") == "in_cell"
+        or (
+            metro_distance_miles is not None
+            and float(metro_distance_miles) <= PUBLIC_REPORT_GENERAL_METRO_RADIUS_MILES
+        )
+    ):
+        if metro_candidate.get("match_scope") == "in_cell":
+            general_name = f"{metro_name}{state_suffix}"
+            general_layer = "city"
+        else:
+            general_name = f"near {metro_name}{state_suffix}"
+            general_layer = "metro_area"
+    elif state_region is not None:
+        general_name = state_region
+        general_layer = "state_region"
+    elif state_name is not None:
+        general_name = state_name
+        general_layer = "state"
+    elif landmark_name is not None:
+        general_name = f"near {landmark_name}"
+        general_layer = "landmark_or_address"
+    else:
+        general_name = exact_point
+        general_layer = "exact_point"
+
+    identity_stack = [
+        {"layer": "exact_point", "name": exact_point},
+        {"layer": "landmark_or_address", "name": landmark_name},
+        {"layer": "neighborhood", "name": None},
+        {"layer": "district", "name": None},
+        {"layer": "city", "name": anchor_name},
+        {"layer": "county", "name": anchor_county},
+        {"layer": "metro_area", "name": metro_name},
+        {"layer": "state_region", "name": state_region},
+        {"layer": "state", "name": state_name},
+        {"layer": "national_region", "name": national_region},
+        {"layer": "country", "name": "United States"},
+    ]
+
+    return {
+        "local_cell_name": local_name,
+        "local_cell_name_layer": local_layer,
+        "general_american_cell_name": general_name,
+        "general_american_cell_name_layer": general_layer,
+        "identity_stack_json": json.dumps(identity_stack, ensure_ascii=True),
     }
 
 
@@ -4205,13 +4558,19 @@ def _annotate_public_report_cell_names(frame, place_catalog=None, place_anchor_c
 
     lookup_points = lookup_frame.geometry.representative_point()
     if "latitude" not in named.columns:
-        named["latitude"] = lookup_points.y
-    else:
-        named["latitude"] = named["latitude"].fillna(lookup_points.y)
+        named["latitude"] = np.nan
     if "longitude" not in named.columns:
-        named["longitude"] = lookup_points.x
-    else:
-        named["longitude"] = named["longitude"].fillna(lookup_points.x)
+        named["longitude"] = np.nan
+    named["latitude"] = pd.to_numeric(named["latitude"], errors="coerce")
+    named["longitude"] = pd.to_numeric(named["longitude"], errors="coerce")
+    invalid_coordinate_mask = (
+        named["latitude"].isna()
+        | named["longitude"].isna()
+        | ~named["latitude"].between(-90.0, 90.0)
+        | ~named["longitude"].between(-180.0, 180.0)
+    )
+    named.loc[invalid_coordinate_mask, "latitude"] = lookup_points.y.loc[invalid_coordinate_mask]
+    named.loc[invalid_coordinate_mask, "longitude"] = lookup_points.x.loc[invalid_coordinate_mask]
 
     try:
         cell_key = _select_public_buildout_cell_key(named)
@@ -4247,17 +4606,27 @@ def _annotate_public_report_cell_names(frame, place_catalog=None, place_anchor_c
             anchor_catalog_df,
             base_cell_name=chosen["cell_name"],
         )
+        identity_fields = _build_public_report_identity_fields(
+            center_latitude,
+            center_longitude,
+            metro_candidate,
+            natural_candidate,
+            anchor_place,
+        )
         annotation_rows.append(
             {
                 "metro_feature_name": metro_candidate["feature_name"],
                 "metro_feature_popularity_score": metro_candidate["popularity_score"],
                 "metro_feature_distance_degrees": metro_candidate["distance_degrees"],
+                "metro_feature_distance_miles": metro_candidate["distance_miles"],
                 "metro_feature_match_scope": metro_candidate["match_scope"],
                 "natural_feature_name": natural_candidate["feature_name"],
                 "natural_feature_popularity_score": natural_candidate["popularity_score"],
                 "natural_feature_distance_degrees": natural_candidate["distance_degrees"],
+                "natural_feature_distance_miles": natural_candidate["distance_miles"],
                 "natural_feature_match_scope": natural_candidate["match_scope"],
                 **anchor_place,
+                **identity_fields,
                 **chosen,
             }
         )
@@ -4290,6 +4659,11 @@ def _build_public_report_ranked_suitability_summary(frame):
         "cell_id",
         "cell_name",
         "base_cell_name",
+        "local_cell_name",
+        "local_cell_name_layer",
+        "general_american_cell_name",
+        "general_american_cell_name_layer",
+        "identity_stack_json",
         "cell_name_basis",
         "cell_name_is_disambiguated",
         "anchor_place_name",
@@ -4310,10 +4684,12 @@ def _build_public_report_ranked_suitability_summary(frame):
         "metro_feature_name",
         "metro_feature_popularity_score",
         "metro_feature_distance_degrees",
+        "metro_feature_distance_miles",
         "metro_feature_match_scope",
         "natural_feature_name",
         "natural_feature_popularity_score",
         "natural_feature_distance_degrees",
+        "natural_feature_distance_miles",
         "natural_feature_match_scope",
     ]
     ordered_columns = [column for column in preferred_columns if column in ranked.columns]
@@ -4347,12 +4723,12 @@ def _build_public_report_output_labels(output_dir):
         {
             "label": "public_report_feasible_land",
             "path": (output_dir / "public_report_feasible_land.gpkg").as_posix(),
-            "description": "bounded feasible-land approximation derived from execution-grid cells where developable_capacity_mw > 0 and NLCD water/wetland share across classes 11, 90, and 95 remains below 0.5",
+            "description": "bounded feasible-land approximation derived from execution-grid cells where developable_capacity_mw > 0; cells with NLCD water/wetland share across classes 11, 90, and 95 at or above 0.5 are retained and flagged for suitability-percentile clamping",
         },
         {
             "label": "public_report_suitability_percentiles",
             "path": (output_dir / "public_report_suitability_percentiles.gpkg").as_posix(),
-            "description": "bounded suitability-percentile surface derived from the pre-existing suitability_score field on feasible cells",
+            "description": "bounded suitability-percentile surface derived from the pre-existing suitability_score field on developable cells, with water/wetland-excluded cells clamped to 0 percentile",
         },
         {
             "label": "public_report_suitability_ranked_cells",
@@ -4373,6 +4749,16 @@ def _build_public_report_output_labels(output_dir):
             "label": "public_report_zoning_proxy",
             "path": (output_dir / "public_report_zoning_proxy.gpkg").as_posix(),
             "description": "bounded zoning proxy derived from NLCD developed-land context sampled onto the execution-grid cells",
+        },
+        {
+            "label": "public_report_permitting_proxy",
+            "path": (output_dir / "public_report_permitting_proxy.gpkg").as_posix(),
+            "description": "bounded permitting and ordinance evidence proxy derived from a manually curated public evidence manifest and transferred onto the execution-grid cells",
+        },
+        {
+            "label": "public_report_social_friction_proxy",
+            "path": (output_dir / "public_report_social_friction_proxy.gpkg").as_posix(),
+            "description": "bounded social-friction evidence proxy derived from a manually curated public evidence manifest and transferred onto the execution-grid cells",
         },
         {
             "label": "public_report_suitability_map",
@@ -4455,9 +4841,11 @@ def _build_public_report_assumption_registry(repo_root, output_dir):
             "baseline_year": PUBLIC_REPORT_BUNDLE_BASELINE_YEAR,
             "grid_path": (repo_root / PUBLIC_REPORT_BUNDLE_GRID_PATH).as_posix(),
             "grid_priority": PUBLIC_REPORT_BUNDLE_GRID_PRIORITY,
-            "feasible_land_rule": "developable_capacity_mw > 0 and NLCD water/wetland share across classes 11, 90, and 95 < 0.5",
-            "suitability_percentile_rule": "percentile rank of suitability_score across feasible cells",
+            "feasible_land_rule": "developable_capacity_mw > 0; cells with NLCD water/wetland share across classes 11, 90, and 95 >= 0.5 are retained and clamped to 0 suitability percentile",
+            "suitability_percentile_rule": "percentile rank of suitability_score across developable cells, with water/wetland-excluded cells clamped to 0",
             "ranked_summary_rule": "sort by suitability_percentile desc, suitability_score desc, developable_capacity_mw desc, sc_point_gid asc",
+            "permitting_proxy_rule": "manually curated public permitting and ordinance evidence points from external-data/manifest/permitting-ordinance-evidence.csv are assigned to execution-grid cells and classified as restrictive ordinance evidence, public friction signal, permit activity record, or no public evidence recorded",
+            "social_friction_proxy_rule": "manually curated public social-friction evidence points from external-data/manifest/social-friction-evidence.csv are assigned to execution-grid cells and classified as organized opposition evidence, public concern signal, community engagement record, or no public evidence recorded",
             "output_dir": Path(output_dir).as_posix(),
         },
         "scenario_inputs": [
@@ -4789,6 +5177,347 @@ def _write_public_report_zoning_proxy(output_dir, repo_root, suitability):
     return proxy_df, proxy_path
 
 
+def _empty_public_report_evidence_frame(evidence_columns):
+    """Return an empty evidence manifest frame with the expected schema."""
+    return pd.DataFrame(columns=evidence_columns)
+
+
+def _load_public_report_evidence_manifest(repo_root, manifest_path, evidence_columns, label):
+    """Load a staged point-evidence manifest if present."""
+    repo_root = Path(repo_root).resolve()
+    manifest_path = repo_root / manifest_path
+    if not manifest_path.exists():
+        return _empty_public_report_evidence_frame(evidence_columns)
+
+    evidence = pd.read_csv(manifest_path, dtype=str).fillna("")
+    missing_columns = [column for column in evidence_columns if column not in evidence.columns]
+    if missing_columns:
+        raise ValueError(
+            f"{label} evidence manifest is missing required columns: "
+            + ", ".join(missing_columns)
+        )
+
+    evidence = evidence.loc[:, evidence_columns].copy()
+    evidence["latitude"] = pd.to_numeric(evidence["latitude"], errors="coerce")
+    evidence["longitude"] = pd.to_numeric(evidence["longitude"], errors="coerce")
+    evidence = evidence.dropna(subset=["latitude", "longitude"]).reset_index(drop=True)
+    evidence["evidence_type"] = evidence["evidence_type"].str.strip().str.lower()
+    evidence["friction_level"] = evidence["friction_level"].str.strip().str.lower()
+    evidence["evidence_id"] = evidence["evidence_id"].str.strip()
+    return evidence
+
+
+def _load_public_report_permitting_evidence(repo_root):
+    """Load the staged public permitting and ordinance evidence manifest if present."""
+    return _load_public_report_evidence_manifest(
+        repo_root,
+        PUBLIC_REPORT_PERMITTING_EVIDENCE_MANIFEST_PATH,
+        PUBLIC_REPORT_PERMITTING_EVIDENCE_COLUMNS,
+        "Permitting",
+    )
+
+
+def _load_public_report_social_friction_evidence(repo_root):
+    """Load the staged public social-friction evidence manifest if present."""
+    return _load_public_report_evidence_manifest(
+        repo_root,
+        PUBLIC_REPORT_SOCIAL_FRICTION_EVIDENCE_MANIFEST_PATH,
+        PUBLIC_REPORT_SOCIAL_FRICTION_EVIDENCE_COLUMNS,
+        "Social-friction",
+    )
+
+
+def _public_report_cell_key_column(frame):
+    """Return the stable cell-key column used by report-bundle grid surfaces."""
+    if "sc_point_gid" in frame.columns:
+        return "sc_point_gid"
+    if "gid" in frame.columns:
+        return "gid"
+    raise ValueError("Report-bundle surfaces require sc_point_gid or gid for cell joins")
+
+
+def _classify_public_report_permitting_proxy(
+    evidence_count,
+    restrictive_evidence_count,
+    friction_evidence_count,
+):
+    """Classify the manifest-driven permitting evidence signal for one cell."""
+    if int(evidence_count) == 0:
+        return "no_public_evidence_recorded"
+    if int(restrictive_evidence_count) > 0:
+        return "restrictive_ordinance_evidence"
+    if int(friction_evidence_count) > 0:
+        return "public_friction_signal"
+    return "permit_activity_record"
+
+
+def _assign_public_report_evidence_to_cells(evidence, suitability, evidence_columns):
+    """Assign evidence points to suitability cells using the grid geometry."""
+    if evidence.empty:
+        return pd.DataFrame(columns=["cell_key", *evidence_columns])
+
+    cell_key_column = _public_report_cell_key_column(suitability)
+    points = gpd.GeoDataFrame(
+        evidence.copy(),
+        geometry=gpd.points_from_xy(evidence["longitude"], evidence["latitude"]),
+        crs="EPSG:4326",
+    )
+    if suitability.crs is not None and points.crs != suitability.crs:
+        points = points.to_crs(suitability.crs)
+
+    cell_frame = suitability[[cell_key_column, "geometry"]].copy()
+    assignments = []
+    for evidence_row in points.itertuples(index=False):
+        point = evidence_row.geometry
+        matched_cell_key = None
+        for cell_row in cell_frame.itertuples(index=False):
+            if cell_row.geometry is not None and cell_row.geometry.covers(point):
+                matched_cell_key = getattr(cell_row, cell_key_column)
+                break
+        if matched_cell_key is None:
+            continue
+        record = {column: getattr(evidence_row, column) for column in evidence_columns}
+        record["cell_key"] = matched_cell_key
+        assignments.append(record)
+
+    return pd.DataFrame(assignments)
+
+
+def _assign_public_report_permitting_evidence_to_cells(evidence, suitability):
+    """Assign permitting evidence points to suitability cells using the grid geometry."""
+    return _assign_public_report_evidence_to_cells(
+        evidence,
+        suitability,
+        PUBLIC_REPORT_PERMITTING_EVIDENCE_COLUMNS,
+    )
+
+
+def _assign_public_report_social_friction_evidence_to_cells(evidence, suitability):
+    """Assign social-friction evidence points to suitability cells using the grid geometry."""
+    return _assign_public_report_evidence_to_cells(
+        evidence,
+        suitability,
+        PUBLIC_REPORT_SOCIAL_FRICTION_EVIDENCE_COLUMNS,
+    )
+
+
+def _join_unique_public_report_values(values):
+    """Join non-empty unique manifest values into a stable semicolon-delimited field."""
+    clean_values = sorted({str(value).strip() for value in values if str(value).strip()})
+    return ";".join(clean_values)
+
+
+def _build_public_report_permitting_proxy_frame(repo_root, suitability):
+    """Build a bounded permitting and ordinance evidence proxy layer."""
+    proxy_df = suitability.copy()
+    cell_key_column = _public_report_cell_key_column(proxy_df)
+    cell_keys = proxy_df[cell_key_column].astype(str)
+
+    proxy_df["evidence_count"] = 0
+    proxy_df["restrictive_evidence_count"] = 0
+    proxy_df["friction_evidence_count"] = 0
+    proxy_df["permit_activity_evidence_count"] = 0
+    proxy_df["source_evidence_ids"] = ""
+    proxy_df["permitting_evidence_types"] = ""
+    proxy_df["permitting_jurisdictions"] = ""
+
+    evidence = _load_public_report_permitting_evidence(repo_root)
+    assignments = _assign_public_report_permitting_evidence_to_cells(evidence, suitability)
+    if not assignments.empty:
+        assignments["is_restrictive_evidence"] = assignments["evidence_type"].isin(
+            PUBLIC_REPORT_PERMITTING_RESTRICTIVE_TYPES
+        ) | assignments["friction_level"].isin(PUBLIC_REPORT_PERMITTING_RESTRICTIVE_LEVELS)
+        assignments["is_friction_evidence"] = assignments["evidence_type"].isin(
+            PUBLIC_REPORT_PERMITTING_FRICTION_TYPES
+        ) | assignments["friction_level"].isin(PUBLIC_REPORT_PERMITTING_FRICTION_LEVELS)
+        assignments["is_permit_activity_evidence"] = ~(
+            assignments["is_restrictive_evidence"] | assignments["is_friction_evidence"]
+        )
+
+        grouped = assignments.groupby(assignments["cell_key"].astype(str), sort=False)
+        for cell_key, group in grouped:
+            row_mask = cell_keys == cell_key
+            proxy_df.loc[row_mask, "evidence_count"] = int(len(group))
+            proxy_df.loc[row_mask, "restrictive_evidence_count"] = int(
+                group["is_restrictive_evidence"].sum()
+            )
+            proxy_df.loc[row_mask, "friction_evidence_count"] = int(
+                group["is_friction_evidence"].sum()
+            )
+            proxy_df.loc[row_mask, "permit_activity_evidence_count"] = int(
+                group["is_permit_activity_evidence"].sum()
+            )
+            proxy_df.loc[row_mask, "source_evidence_ids"] = _join_unique_public_report_values(
+                group["evidence_id"]
+            )
+            proxy_df.loc[row_mask, "permitting_evidence_types"] = _join_unique_public_report_values(
+                group["evidence_type"]
+            )
+            proxy_df.loc[row_mask, "permitting_jurisdictions"] = _join_unique_public_report_values(
+                group["jurisdiction_name"]
+            )
+
+    proxy_df["permitting_proxy_class"] = [
+        _classify_public_report_permitting_proxy(evidence_count, restrictive_count, friction_count)
+        for evidence_count, restrictive_count, friction_count in zip(
+            proxy_df["evidence_count"],
+            proxy_df["restrictive_evidence_count"],
+            proxy_df["friction_evidence_count"],
+            strict=False,
+        )
+    ]
+    proxy_df["permitting_proxy_note"] = (
+        "Manifest-driven public permitting and ordinance evidence proxy, not permit readiness, legal entitlement, or ordinance compatibility."
+    )
+
+    ordered_columns = [
+        column
+        for column in (
+            "gid",
+            "sc_point_gid",
+            "latitude",
+            "longitude",
+            "developable_capacity_mw",
+            "suitability_score",
+            "evidence_count",
+            "restrictive_evidence_count",
+            "friction_evidence_count",
+            "permit_activity_evidence_count",
+            "source_evidence_ids",
+            "permitting_evidence_types",
+            "permitting_jurisdictions",
+            "permitting_proxy_class",
+            "permitting_proxy_note",
+            "geometry",
+        )
+        if column in proxy_df.columns
+    ]
+    return proxy_df[ordered_columns].copy()
+
+
+def _write_public_report_permitting_proxy(output_dir, repo_root, suitability):
+    """Write the bounded permitting evidence proxy layer used by the report-bundle map."""
+    output_dir = Path(output_dir)
+    output_dir.mkdir(parents=True, exist_ok=True)
+    proxy_df = _build_public_report_permitting_proxy_frame(repo_root, suitability)
+    proxy_path = output_dir / "public_report_permitting_proxy.gpkg"
+    proxy_df.to_file(proxy_path, driver="GPKG")
+    return proxy_df, proxy_path
+
+
+def _classify_public_report_social_friction_proxy(
+    evidence_count,
+    opposition_evidence_count,
+    concern_evidence_count,
+):
+    """Classify the manifest-driven social-friction evidence signal for one cell."""
+    if int(evidence_count) == 0:
+        return "no_public_evidence_recorded"
+    if int(opposition_evidence_count) > 0:
+        return "organized_opposition_evidence"
+    if int(concern_evidence_count) > 0:
+        return "public_concern_signal"
+    return "community_engagement_record"
+
+
+def _build_public_report_social_friction_proxy_frame(repo_root, suitability):
+    """Build a bounded social-friction evidence proxy layer."""
+    proxy_df = suitability.copy()
+    cell_key_column = _public_report_cell_key_column(proxy_df)
+    cell_keys = proxy_df[cell_key_column].astype(str)
+
+    proxy_df["evidence_count"] = 0
+    proxy_df["opposition_evidence_count"] = 0
+    proxy_df["concern_evidence_count"] = 0
+    proxy_df["engagement_evidence_count"] = 0
+    proxy_df["source_evidence_ids"] = ""
+    proxy_df["social_evidence_types"] = ""
+    proxy_df["social_communities"] = ""
+
+    evidence = _load_public_report_social_friction_evidence(repo_root)
+    assignments = _assign_public_report_social_friction_evidence_to_cells(evidence, suitability)
+    if not assignments.empty:
+        assignments["is_opposition_evidence"] = assignments["evidence_type"].isin(
+            PUBLIC_REPORT_SOCIAL_FRICTION_OPPOSITION_TYPES
+        ) | assignments["friction_level"].isin(PUBLIC_REPORT_SOCIAL_FRICTION_OPPOSITION_LEVELS)
+        assignments["is_concern_evidence"] = assignments["evidence_type"].isin(
+            PUBLIC_REPORT_SOCIAL_FRICTION_CONCERN_TYPES
+        ) | assignments["friction_level"].isin(PUBLIC_REPORT_SOCIAL_FRICTION_CONCERN_LEVELS)
+        assignments["is_engagement_evidence"] = ~(
+            assignments["is_opposition_evidence"] | assignments["is_concern_evidence"]
+        )
+
+        grouped = assignments.groupby(assignments["cell_key"].astype(str), sort=False)
+        for cell_key, group in grouped:
+            row_mask = cell_keys == cell_key
+            proxy_df.loc[row_mask, "evidence_count"] = int(len(group))
+            proxy_df.loc[row_mask, "opposition_evidence_count"] = int(
+                group["is_opposition_evidence"].sum()
+            )
+            proxy_df.loc[row_mask, "concern_evidence_count"] = int(
+                group["is_concern_evidence"].sum()
+            )
+            proxy_df.loc[row_mask, "engagement_evidence_count"] = int(
+                group["is_engagement_evidence"].sum()
+            )
+            proxy_df.loc[row_mask, "source_evidence_ids"] = _join_unique_public_report_values(
+                group["evidence_id"]
+            )
+            proxy_df.loc[row_mask, "social_evidence_types"] = _join_unique_public_report_values(
+                group["evidence_type"]
+            )
+            proxy_df.loc[row_mask, "social_communities"] = _join_unique_public_report_values(
+                group["community_name"]
+            )
+
+    proxy_df["social_friction_proxy_class"] = [
+        _classify_public_report_social_friction_proxy(evidence_count, opposition_count, concern_count)
+        for evidence_count, opposition_count, concern_count in zip(
+            proxy_df["evidence_count"],
+            proxy_df["opposition_evidence_count"],
+            proxy_df["concern_evidence_count"],
+            strict=False,
+        )
+    ]
+    proxy_df["social_friction_proxy_note"] = (
+        "Manifest-driven public social-friction evidence proxy, not a measure of actual community acceptance or social license."
+    )
+
+    ordered_columns = [
+        column
+        for column in (
+            "gid",
+            "sc_point_gid",
+            "latitude",
+            "longitude",
+            "developable_capacity_mw",
+            "suitability_score",
+            "evidence_count",
+            "opposition_evidence_count",
+            "concern_evidence_count",
+            "engagement_evidence_count",
+            "source_evidence_ids",
+            "social_evidence_types",
+            "social_communities",
+            "social_friction_proxy_class",
+            "social_friction_proxy_note",
+            "geometry",
+        )
+        if column in proxy_df.columns
+    ]
+    return proxy_df[ordered_columns].copy()
+
+
+def _write_public_report_social_friction_proxy(output_dir, repo_root, suitability):
+    """Write the bounded social-friction proxy layer used by the report-bundle map."""
+    output_dir = Path(output_dir)
+    output_dir.mkdir(parents=True, exist_ok=True)
+    proxy_df = _build_public_report_social_friction_proxy_frame(repo_root, suitability)
+    proxy_path = output_dir / "public_report_social_friction_proxy.gpkg"
+    proxy_df.to_file(proxy_path, driver="GPKG")
+    return proxy_df, proxy_path
+
+
 def _build_public_report_suitability_map_rows(frame, limit=12):
     """Prepare ranked suitability rows for embedding in the HTML map page."""
     safe = frame.head(limit).copy()
@@ -4803,6 +5532,8 @@ def _write_public_report_suitability_map(
     ranked_suitability,
     state_boundaries,
     zoning_proxy,
+    permitting_proxy,
+    social_friction_proxy,
     hosting_proxy,
 ):
     """Render a single-page D3 suitability map for quick visual review of the bounded bundle."""
@@ -4814,6 +5545,8 @@ def _write_public_report_suitability_map(
     suitability_geojson = json.loads(suitability.to_json())
     state_boundary_geojson = json.loads(state_boundaries.to_json())
     zoning_proxy_geojson = json.loads(zoning_proxy.to_json())
+    permitting_proxy_geojson = json.loads(permitting_proxy.to_json())
+    social_friction_proxy_geojson = json.loads(social_friction_proxy.to_json())
     hosting_proxy_geojson = json.loads(hosting_proxy.to_json())
     ranked_rows = _build_public_report_suitability_map_rows(ranked_suitability)
 
@@ -4833,32 +5566,108 @@ def _write_public_report_suitability_map(
     }
 
     html = f"""<!DOCTYPE html>
-<html lang=\"en\">
+<html lang=\"en\" data-theme-mode=\"system\" data-theme=\"light\">
 <head>
     <meta charset=\"utf-8\">
     <meta name=\"viewport\" content=\"width=device-width, initial-scale=1\">
     <title>Bounded Public Suitability Map</title>
     <script src=\"https://d3js.org/d3.v7.min.js\"></script>
+    <script>
+        (() => {{
+            const THEME_STORAGE_KEY = "reveal-report-theme";
+            const validThemeModes = ["light", "dark", "system"];
+            const readStoredThemeMode = () => {{
+                try {{
+                    return localStorage.getItem(THEME_STORAGE_KEY) || "system";
+                }} catch (error) {{
+                    return "system";
+                }}
+            }};
+            const storedMode = readStoredThemeMode();
+            const mode = validThemeModes.includes(storedMode) ? storedMode : "system";
+            const prefersDark = window.matchMedia?.("(prefers-color-scheme: dark)").matches;
+            const resolvedTheme = mode === "dark" || (mode === "system" && prefersDark) ? "dark" : "light";
+            document.documentElement.dataset.themeMode = mode;
+            document.documentElement.dataset.theme = resolvedTheme;
+        }})();
+    </script>
     <style>
         :root {{
+            color-scheme: light;
             --paper: #f5efe4;
             --ink: #1f2927;
             --muted: #6c7367;
             --line: #d8cebd;
             --card: rgba(255, 252, 246, 0.94);
+            --card-border: rgba(127, 115, 88, 0.18);
             --shadow: rgba(37, 34, 24, 0.12);
             --accent: #0c5c59;
             --accent-soft: #d8ebe7;
+            --active-text: #f7f3ea;
+            --body-background: radial-gradient(circle at top left, rgba(20, 92, 89, 0.16), transparent 28%), radial-gradient(circle at bottom right, rgba(181, 131, 65, 0.14), transparent 24%), linear-gradient(180deg, #f9f5ee 0%, #efe6d8 100%);
+            --map-background: linear-gradient(180deg, rgba(255,255,255,0.7), rgba(239,230,216,0.72));
+            --map-cover: rgba(255, 255, 255, 0.42);
+            --note-bg: rgba(216, 235, 231, 0.8);
+            --note-ink: #21403f;
+            --layer-panel-bg: rgba(245, 239, 228, 0.82);
+            --stat-bg: rgba(12, 92, 89, 0.06);
+            --stat-border: rgba(12, 92, 89, 0.08);
+            --control-bg: rgba(255, 250, 240, 0.92);
+            --control-border: rgba(45, 40, 29, 0.14);
+            --control-shadow: rgba(24, 35, 35, 0.12);
+            --legend-border: rgba(45, 40, 29, 0.14);
+            --row-active-bg: rgba(12, 92, 89, 0.12);
+            --feasible-fill: #ddd2bf;
+            --cell-stroke: rgba(255, 255, 255, 0.92);
+            --state-stroke: rgba(31, 41, 39, 0.42);
+            --hex-state-stroke: rgba(31, 41, 39, 0.64);
+            --active-stroke: #c45c13;
+            --active-filter: drop-shadow(0 0 3px rgba(196, 92, 19, 0.45));
+            --tooltip-bg: rgba(30, 36, 35, 0.94);
+            --tooltip-ink: #f7f3ea;
+            --empty-map-text: #5a625a;
+        }}
+        html[data-theme="dark"] {{
+            color-scheme: dark;
+            --paper: #101715;
+            --ink: #edf2eb;
+            --muted: #aeb8ad;
+            --line: #33403b;
+            --card: rgba(24, 31, 29, 0.94);
+            --card-border: rgba(187, 205, 195, 0.16);
+            --shadow: rgba(0, 0, 0, 0.34);
+            --accent: #75c9bd;
+            --accent-soft: #173b39;
+            --active-text: #071311;
+            --body-background: radial-gradient(circle at top left, rgba(117, 201, 189, 0.12), transparent 28%), radial-gradient(circle at bottom right, rgba(218, 153, 76, 0.12), transparent 24%), linear-gradient(180deg, #0b1110 0%, #161d1b 100%);
+            --map-background: linear-gradient(180deg, rgba(21, 29, 27, 0.96), rgba(13, 18, 17, 0.96));
+            --map-cover: rgba(9, 13, 12, 0.36);
+            --note-bg: rgba(28, 63, 59, 0.72);
+            --note-ink: #d7eee9;
+            --layer-panel-bg: rgba(23, 30, 28, 0.9);
+            --stat-bg: rgba(117, 201, 189, 0.1);
+            --stat-border: rgba(117, 201, 189, 0.18);
+            --control-bg: rgba(20, 27, 25, 0.94);
+            --control-border: rgba(187, 205, 195, 0.18);
+            --control-shadow: rgba(0, 0, 0, 0.38);
+            --legend-border: rgba(187, 205, 195, 0.22);
+            --row-active-bg: rgba(117, 201, 189, 0.16);
+            --feasible-fill: #3a4037;
+            --cell-stroke: rgba(13, 18, 17, 0.78);
+            --state-stroke: rgba(225, 236, 230, 0.54);
+            --hex-state-stroke: rgba(225, 236, 230, 0.74);
+            --active-stroke: #f0a45f;
+            --active-filter: drop-shadow(0 0 4px rgba(240, 164, 95, 0.6));
+            --tooltip-bg: rgba(236, 241, 234, 0.96);
+            --tooltip-ink: #101715;
+            --empty-map-text: #d0d8d0;
         }}
         * {{ box-sizing: border-box; }}
         body {{
             margin: 0;
             font-family: \"Avenir Next\", \"Gill Sans\", sans-serif;
             color: var(--ink);
-            background:
-                radial-gradient(circle at top left, rgba(20, 92, 89, 0.16), transparent 28%),
-                radial-gradient(circle at bottom right, rgba(181, 131, 65, 0.14), transparent 24%),
-                linear-gradient(180deg, #f9f5ee 0%, #efe6d8 100%);
+            background: var(--body-background);
             min-height: 100vh;
         }}
         .page {{
@@ -4893,7 +5702,7 @@ def _write_public_report_suitability_map(
         }}
         .card {{
             background: var(--card);
-            border: 1px solid rgba(127, 115, 88, 0.18);
+            border: 1px solid var(--card-border);
             border-radius: 24px;
             box-shadow: 0 18px 40px var(--shadow);
             backdrop-filter: blur(8px);
@@ -4911,7 +5720,7 @@ def _write_public_report_suitability_map(
             height: auto;
             min-height: 620px;
             border-radius: 18px;
-            background: linear-gradient(180deg, rgba(255,255,255,0.7), rgba(239,230,216,0.72));
+            background: var(--map-background);
         }}
         .legend {{
             display: flex;
@@ -4927,7 +5736,7 @@ def _write_public_report_suitability_map(
             height: 12px;
             border-radius: 999px;
             background: linear-gradient(90deg, #440154 0%, #3b528b 25%, #21918c 60%, #5dc863 82%, #fde725 100%);
-            border: 1px solid rgba(45, 40, 29, 0.14);
+            border: 1px solid var(--legend-border);
         }}
         .panel {{
             padding: 18px;
@@ -4951,8 +5760,8 @@ def _write_public_report_suitability_map(
         .stat {{
             padding: 14px;
             border-radius: 18px;
-            background: rgba(12, 92, 89, 0.06);
-            border: 1px solid rgba(12, 92, 89, 0.08);
+            background: var(--stat-bg);
+            border: 1px solid var(--stat-border);
         }}
         .stat-label {{
             font-size: 0.72rem;
@@ -4968,9 +5777,12 @@ def _write_public_report_suitability_map(
         .note {{
             padding: 14px 16px;
             border-radius: 18px;
-            background: rgba(216, 235, 231, 0.8);
-            color: #21403f;
+            background: var(--note-bg);
+            color: var(--note-ink);
             line-height: 1.5;
+        }}
+        .layer-panel {{
+            background: var(--layer-panel-bg);
         }}
         table {{
             width: 100%;
@@ -4993,7 +5805,7 @@ def _write_public_report_suitability_map(
             transition: background-color 120ms ease;
         }}
         tbody tr.is-active {{
-            background: rgba(12, 92, 89, 0.12);
+            background: var(--row-active-bg);
         }}
         .cell-name {{
             display: block;
@@ -5025,8 +5837,55 @@ def _write_public_report_suitability_map(
         }}
         .layer-toggle.is-active {{
             background: var(--accent);
-            color: #f7f3ea;
+            color: var(--active-text);
             border-color: var(--accent);
+        }}
+        .map-controls {{
+            position: absolute;
+            top: 16px;
+            right: 16px;
+            display: flex;
+            flex-wrap: wrap;
+            justify-content: flex-end;
+            gap: 8px;
+            max-width: calc(100% - 32px);
+            z-index: 2;
+        }}
+        .shape-control {{
+            display: inline-grid;
+            grid-auto-flow: column;
+            gap: 4px;
+            padding: 4px;
+            border-radius: 8px;
+            background: var(--control-bg);
+            border: 1px solid var(--control-border);
+            box-shadow: 0 10px 24px var(--control-shadow);
+        }}
+        .theme-control {{
+            display: inline-grid;
+            grid-auto-flow: column;
+            gap: 4px;
+            padding: 4px;
+            border-radius: 8px;
+            background: var(--control-bg);
+            border: 1px solid var(--control-border);
+            box-shadow: 0 10px 24px var(--control-shadow);
+        }}
+        .shape-toggle,
+        .theme-toggle {{
+            border: 0;
+            border-radius: 6px;
+            background: transparent;
+            color: var(--muted);
+            padding: 7px 10px;
+            font: inherit;
+            font-size: 0.82rem;
+            cursor: pointer;
+        }}
+        .shape-toggle.is-active,
+        .theme-toggle.is-active {{
+            background: var(--accent);
+            color: var(--active-text);
         }}
         .layer-note {{
             margin: 0;
@@ -5050,17 +5909,31 @@ def _write_public_report_suitability_map(
             width: 12px;
             height: 12px;
             border-radius: 999px;
-            border: 1px solid rgba(45, 40, 29, 0.14);
+            border: 1px solid var(--legend-border);
+        }}
+        .map-background {{
+            fill: var(--map-cover);
+        }}
+        .feasible-hex {{
+            fill: var(--feasible-fill);
+            stroke: var(--cell-stroke);
         }}
         .suitability-cell {{
             transition: stroke 120ms ease, stroke-width 120ms ease, filter 120ms ease;
+            stroke: var(--cell-stroke);
         }}
         .suitability-cell.is-active {{
-            stroke: #c45c13;
+            stroke: var(--active-stroke);
             stroke-width: 1.8;
-            filter: drop-shadow(0 0 3px rgba(196, 92, 19, 0.45));
+            filter: var(--active-filter);
         }}
         .zoning-proxy-cell {{
+            pointer-events: none;
+        }}
+        .permitting-proxy-cell {{
+            pointer-events: none;
+        }}
+        .social-friction-proxy-cell {{
             pointer-events: none;
         }}
         .hosting-proxy-cell {{
@@ -5068,14 +5941,27 @@ def _write_public_report_suitability_map(
         }}
         .state-boundary {{
             pointer-events: none;
+            transition: opacity 120ms ease, stroke 120ms ease;
+            stroke: var(--state-stroke);
+        }}
+        .state-boundary.is-display-reference {{
+            opacity: 0.55;
+        }}
+        .hex-state-boundary {{
+            pointer-events: none;
+            fill: none;
+            stroke: var(--hex-state-stroke);
+            stroke-width: 1.25;
+            stroke-linecap: round;
+            stroke-linejoin: round;
         }}
         .tooltip {{
             position: fixed;
             pointer-events: none;
             opacity: 0;
             transform: translate(-50%, calc(-100% - 14px));
-            background: rgba(30, 36, 35, 0.94);
-            color: #f7f3ea;
+            background: var(--tooltip-bg);
+            color: var(--tooltip-ink);
             padding: 10px 12px;
             border-radius: 12px;
             font-size: 0.88rem;
@@ -5100,15 +5986,26 @@ def _write_public_report_suitability_map(
         <header class=\"hero\">
             <span class=\"eyebrow\">Bounded Public Bundle · D3 Map</span>
             <h1>Bounded Public Suitability Map</h1>
-            <p>This single-page map renders the current bounded feasible-land and suitability-percentile surfaces directly in the browser, displaying grid cells as hexagons while keeping the original grid geometry and cell IDs as the internal model. It is a quick visual screen, not a report-equivalent nationwide siting product.</p>
+            <p>This single-page map renders the current bounded feasible-land and suitability-percentile surfaces directly in the browser, with a geographic square view and a display-only honeycomb hex view while keeping the original grid geometry and cell IDs as the internal model. It is a quick visual screen, not a report-equivalent nationwide siting product.</p>
         </header>
         <div class=\"layout\">
             <section class=\"card map-card\">
                 <div class=\"map-frame\">
+                    <div class="map-controls">
+                        <div class="theme-control" role="group" aria-label="Theme">
+                            <button type="button" class="theme-toggle" id="system-theme-toggle" aria-pressed="false">System</button>
+                            <button type="button" class="theme-toggle" id="light-theme-toggle" aria-pressed="false">Light</button>
+                            <button type="button" class="theme-toggle" id="dark-theme-toggle" aria-pressed="false">Dark</button>
+                        </div>
+                        <div class="shape-control" role="group" aria-label="Cell display shape">
+                            <button type="button" class="shape-toggle is-active" id="square-shape-toggle" aria-pressed="true">Squares</button>
+                            <button type="button" class="shape-toggle" id="hex-shape-toggle" aria-pressed="false">Hexes</button>
+                        </div>
+                    </div>
                     <svg id=\"map\" viewBox=\"0 0 960 640\" preserveAspectRatio=\"xMidYMid meet\"></svg>
                 </div>
                 <div class=\"legend\">
-                    <p class="note">The browser page uses the bounded feasible-land rule and the existing <strong>suitability_score</strong> field. The display layer draws those grid-backed cells as hexagons for scanning, while preserving grid cell IDs for table, tooltip, and layer joins. It now adds a coarse NLCD developed-land zoning proxy, but permitting and social-acceptance layers remain absent, and the hosting-capacity surface is still only a coarse regional proxy rather than local transmission headroom.</p>
+                    <p class="note">The browser page keeps every developable execution-grid cell in view and uses the existing <strong>suitability_score</strong> field for ranking. Cells meeting the staged NLCD water/wetland screen remain visible but are clamped to 0 suitability percentile. The display layer can show geographically aligned square cells or honeycomb hexes for scanning, while preserving grid cell IDs for table, tooltip, and layer joins. State context uses true Census boundaries in Squares and snapped cell-edge outlines in Hexes. It now adds coarse zoning, permitting evidence, social-friction evidence, and hosting-capacity proxy layers, but those overlays remain screening proxies rather than entitlement, acceptance, or interconnection determinations.</p>
                     <div class=\"legend-bar\"></div>
                     <span>Higher suitability percentile</span>
                 </div>
@@ -5116,7 +6013,7 @@ def _write_public_report_suitability_map(
             <aside class=\"card panel\">
                 <div>
                     <span class=\"eyebrow\">Quick Read</span>
-                    <p class="note">The browser page uses the bounded feasible-land rule and the existing <strong>suitability_score</strong> field. The display layer draws those grid-backed cells as hexagons for scanning, while preserving grid cell IDs for table, tooltip, and layer joins. It now adds a coarse NLCD developed-land zoning proxy, but permitting and social-acceptance layers remain absent, and the hosting-capacity surface is still only a coarse regional proxy rather than local transmission headroom.</p>
+                    <p class="note">The browser page keeps every developable execution-grid cell in view and uses the existing <strong>suitability_score</strong> field for ranking. Cells meeting the staged NLCD water/wetland screen remain visible but are clamped to 0 suitability percentile. The display layer can show geographically aligned square cells or honeycomb hexes for scanning, while preserving grid cell IDs for table, tooltip, and layer joins. State context uses true Census boundaries in Squares and snapped cell-edge outlines in Hexes. It now adds coarse zoning, permitting evidence, social-friction evidence, and hosting-capacity proxy layers, but those overlays remain screening proxies rather than entitlement, acceptance, or interconnection determinations.</p>
                 </div>
                 <section>
                     <div class=\"stat-grid\">
@@ -5141,7 +6038,7 @@ def _write_public_report_suitability_map(
                 <section>
                     <span class="eyebrow">Context Layers</span>
                     <div class="layer-stack">
-                        <div class="note" style="background: rgba(245, 239, 228, 0.82);">
+                        <div class="note layer-panel">
                             <button type="button" class="layer-toggle" id="zoning-layer-toggle" aria-pressed="false">Show Zoning Proxy</button>
                             <p class="layer-note">Zoning Proxy: NLCD developed-land context transferred to the execution grid. This is not parcel zoning or an allowed-use decision.</p>
                             <div class="layer-legend">
@@ -5150,7 +6047,27 @@ def _write_public_report_suitability_map(
                                 <span class="layer-chip"><span class="layer-swatch" style="background: rgba(184, 81, 53, 0.46);"></span>Urban core</span>
                             </div>
                         </div>
-                        <div class="note" style="background: rgba(245, 239, 228, 0.82);">
+                        <div class="note layer-panel">
+                            <button type="button" class="layer-toggle" id="permitting-layer-toggle" aria-pressed="false">Show Permitting / Ordinance Proxy</button>
+                            <p class="layer-note">Permitting / Ordinance Proxy: manually curated public evidence points assigned to execution-grid cells. This is not permit readiness, legal entitlement, or ordinance compatibility.</p>
+                            <div class="layer-legend">
+                                <span class="layer-chip"><span class="layer-swatch" style="background: rgba(108, 115, 103, 0.08);"></span>No public evidence recorded</span>
+                                <span class="layer-chip"><span class="layer-swatch" style="background: rgba(12, 92, 89, 0.40);"></span>Permit activity record</span>
+                                <span class="layer-chip"><span class="layer-swatch" style="background: rgba(198, 92, 19, 0.58);"></span>Public friction signal</span>
+                                <span class="layer-chip"><span class="layer-swatch" style="background: rgba(159, 45, 32, 0.72);"></span>Restrictive ordinance evidence</span>
+                            </div>
+                        </div>
+                        <div class="note layer-panel">
+                            <button type="button" class="layer-toggle" id="social-friction-layer-toggle" aria-pressed="false">Show Social-Friction Proxy</button>
+                            <p class="layer-note">Social-Friction Proxy: manually curated public evidence points assigned to execution-grid cells. This is not a measure of actual community acceptance or social license.</p>
+                            <div class="layer-legend">
+                                <span class="layer-chip"><span class="layer-swatch" style="background: rgba(108, 115, 103, 0.08);"></span>No public evidence recorded</span>
+                                <span class="layer-chip"><span class="layer-swatch" style="background: rgba(12, 92, 89, 0.36);"></span>Engagement record</span>
+                                <span class="layer-chip"><span class="layer-swatch" style="background: rgba(198, 92, 19, 0.58);"></span>Public concern signal</span>
+                                <span class="layer-chip"><span class="layer-swatch" style="background: rgba(159, 45, 32, 0.72);"></span>Organized opposition evidence</span>
+                            </div>
+                        </div>
+                        <div class="note layer-panel">
                             <button type="button" class="layer-toggle" id="hosting-layer-toggle" aria-pressed="false">Show Hosting Capacity Proxy</button>
                             <p class="layer-note">Hosting Capacity Proxy: regional NERC reserve-margin headroom for 2026-2030 transferred to the execution grid. This is not local interconnection or hosting-capacity headroom.</p>
                             <div class="layer-legend">
@@ -5185,9 +6102,54 @@ def _write_public_report_suitability_map(
         const suitabilityGeoJson = {json.dumps(suitability_geojson, separators=(",", ":"))};
         const stateBoundaryGeoJson = {json.dumps(state_boundary_geojson, separators=(",", ":"))};
         const zoningProxyGeoJson = {json.dumps(zoning_proxy_geojson, separators=(",", ":"))};
+        const permittingProxyGeoJson = {json.dumps(permitting_proxy_geojson, separators=(",", ":"))};
+        const socialFrictionProxyGeoJson = {json.dumps(social_friction_proxy_geojson, separators=(",", ":"))};
         const hostingProxyGeoJson = {json.dumps(hosting_proxy_geojson, separators=(",", ":"))};
         const rankedRows = {json.dumps(ranked_rows, separators=(",", ":"))};
         const mapSummary = {json.dumps(map_summary, separators=(",", ":"))};
+
+        const htmlElement = document.documentElement;
+        const THEME_STORAGE_KEY = "reveal-report-theme";
+        const themeModes = ["light", "dark", "system"];
+        const systemThemeQuery = window.matchMedia("(prefers-color-scheme: dark)");
+        const readThemeMode = () => {{
+            try {{
+                const savedMode = localStorage.getItem(THEME_STORAGE_KEY);
+                return themeModes.includes(savedMode) ? savedMode : "system";
+            }} catch (error) {{
+                return "system";
+            }}
+        }};
+        const resolveThemeMode = (mode) => mode === "system" && systemThemeQuery.matches ? "dark" : mode === "dark" ? "dark" : "light";
+        const themeToggleByMode = new Map(themeModes.map((mode) => [mode, d3.select(`#${{mode}}-theme-toggle`)]));
+        const applyThemeMode = (mode) => {{
+            const normalizedMode = themeModes.includes(mode) ? mode : "system";
+            const resolvedTheme = resolveThemeMode(normalizedMode);
+            htmlElement.dataset.themeMode = normalizedMode;
+            htmlElement.dataset.theme = resolvedTheme;
+            themeToggleByMode.forEach((toggle, themeMode) => {{
+                toggle
+                    .classed("is-active", themeMode === normalizedMode)
+                    .attr("aria-pressed", themeMode === normalizedMode ? "true" : "false");
+            }});
+        }};
+        const setThemeMode = (mode) => {{
+            applyThemeMode(mode);
+            try {{
+                localStorage.setItem(THEME_STORAGE_KEY, mode);
+            }} catch (error) {{
+                return;
+            }}
+        }};
+        themeToggleByMode.forEach((toggle, mode) => {{
+            toggle.on("click", () => setThemeMode(mode));
+        }});
+        systemThemeQuery.addEventListener?.("change", () => {{
+            if (htmlElement.dataset.themeMode === "system") {{
+                applyThemeMode("system");
+            }}
+        }});
+        applyThemeMode(readThemeMode());
 
         const width = 960;
         const height = 640;
@@ -5197,6 +6159,8 @@ def _write_public_report_suitability_map(
         const feasibleFeatures = feasibleGeoJson.features || [];
         const stateBoundaryFeatures = stateBoundaryGeoJson.features || [];
         const zoningProxyFeatures = zoningProxyGeoJson.features || [];
+        const permittingProxyFeatures = permittingProxyGeoJson.features || [];
+        const socialFrictionProxyFeatures = socialFrictionProxyGeoJson.features || [];
         const hostingProxyFeatures = hostingProxyGeoJson.features || [];
         const extentSource = features.length ? suitabilityGeoJson : feasibleGeoJson;
 
@@ -5212,6 +6176,8 @@ def _write_public_report_suitability_map(
         const cellPathsByKey = new Map();
         const tableRowsByKey = new Map();
         const zoningProxyByKey = new Map();
+        const permittingProxyByKey = new Map();
+        const socialFrictionProxyByKey = new Map();
         const hostingProxyByKey = new Map();
         const zoningProxyClassLabels = {{
             non_developed_context: "Non-developed context",
@@ -5223,6 +6189,34 @@ def _write_public_report_suitability_map(
             non_developed_context: "rgba(129, 140, 115, 0.42)",
             developed_neighborhood_context: "rgba(209, 168, 72, 0.42)",
             urban_core_context: "rgba(184, 81, 53, 0.46)",
+            unknown: "rgba(108, 115, 103, 0.0)",
+        }};
+        const permittingProxyClassLabels = {{
+            no_public_evidence_recorded: "No public evidence recorded",
+            permit_activity_record: "Permit activity record",
+            public_friction_signal: "Public friction signal",
+            restrictive_ordinance_evidence: "Restrictive ordinance evidence",
+            unknown: "Unavailable",
+        }};
+        const permittingProxyClassColors = {{
+            no_public_evidence_recorded: "rgba(108, 115, 103, 0.08)",
+            permit_activity_record: "rgba(12, 92, 89, 0.40)",
+            public_friction_signal: "rgba(198, 92, 19, 0.58)",
+            restrictive_ordinance_evidence: "rgba(159, 45, 32, 0.72)",
+            unknown: "rgba(108, 115, 103, 0.0)",
+        }};
+        const socialFrictionProxyClassLabels = {{
+            no_public_evidence_recorded: "No public evidence recorded",
+            community_engagement_record: "Community engagement record",
+            public_concern_signal: "Public concern signal",
+            organized_opposition_evidence: "Organized opposition evidence",
+            unknown: "Unavailable",
+        }};
+        const socialFrictionProxyClassColors = {{
+            no_public_evidence_recorded: "rgba(108, 115, 103, 0.08)",
+            community_engagement_record: "rgba(12, 92, 89, 0.36)",
+            public_concern_signal: "rgba(198, 92, 19, 0.58)",
+            organized_opposition_evidence: "rgba(159, 45, 32, 0.72)",
             unknown: "rgba(108, 115, 103, 0.0)",
         }};
         const hostingProxyClassLabels = {{
@@ -5260,21 +6254,55 @@ def _write_public_report_suitability_map(
                 .style("left", `${{event.clientX}}px`)
                 .style("top", `${{event.clientY}}px`);
         }};
-        const renderTooltip = (props, cellKey, zoningProps, hostingProps) => {{
+        const cellNameBasisLabels = {{
+            metro: "metro/city",
+            natural: "natural or regional anchor",
+        }};
+        const cellNameScopeLabels = {{
+            in_cell: "in-cell",
+            nearest_catalog_fallback: "nearest catalog fallback",
+        }};
+        const formatCellNameBasis = (basis, scope) => {{
+            const basisLabel = cellNameBasisLabels[basis] ?? basis ?? "n/a";
+            const scopeLabel = cellNameScopeLabels[scope] ?? scope;
+            return scopeLabel ? `${{scopeLabel}} ${{basisLabel}}` : basisLabel;
+        }};
+        const normalizeDisplayName = (value) => (value ?? "").toString().toLowerCase().replace(/[^a-z0-9]+/g, " ").trim();
+        const displayCellName = (row) => row?.general_american_cell_name ?? row?.cell_name ?? `Cell ${{cellKeyFromObject(row)}}`;
+        const displayLocalCellName = (row) => {{
+            const localName = row?.local_cell_name;
+            const localDisplayName = normalizeDisplayName(localName);
+            const generalDisplayName = normalizeDisplayName(displayCellName(row));
+            if (!localDisplayName || !generalDisplayName) {{
+                return localName ?? null;
+            }}
+            return ` ${{generalDisplayName}} `.includes(` ${{localDisplayName}} `) ? null : localName;
+        }};
+        const renderTooltip = (props, cellKey, zoningProps, permittingProps, socialFrictionProps, hostingProps) => {{
             const zoningClass = zoningProps?.zoning_proxy_class ?? "unknown";
             const zoningLabel = zoningProxyClassLabels[zoningClass] ?? zoningProxyClassLabels.unknown;
+            const permittingClass = permittingProps?.permitting_proxy_class ?? "unknown";
+            const permittingLabel = permittingProxyClassLabels[permittingClass] ?? permittingProxyClassLabels.unknown;
+            const socialFrictionClass = socialFrictionProps?.social_friction_proxy_class ?? "unknown";
+            const socialFrictionLabel = socialFrictionProxyClassLabels[socialFrictionClass] ?? socialFrictionProxyClassLabels.unknown;
             const proxyClass = hostingProps?.hosting_capacity_proxy_class ?? "unknown";
             const proxyLabel = hostingProxyClassLabels[proxyClass] ?? hostingProxyClassLabels.unknown;
             tooltip
                 .style("opacity", 1)
                 .html(`
-                    <strong>${{props.cell_name ?? `Cell ${{cellKey}}`}}</strong><br>
+                    <strong>${{displayCellName(props)}}</strong><br>
                     Cell ID: ${{cellKey}}<br>
-                    Naming basis: ${{props.cell_name_basis ?? "n/a"}}<br>
+                    Local identity: ${{props.local_cell_name ?? "n/a"}}<br>
+                    Identity stack: ${{props.general_american_cell_name_layer ?? "n/a"}} / ${{props.local_cell_name_layer ?? "n/a"}}<br>
+                    Label source: ${{formatCellNameBasis(props.cell_name_basis, props.cell_name_match_scope)}}<br>
                     Suitability percentile: ${{props.suitability_percentile == null ? "n/a" : d3.format(".1f")(props.suitability_percentile)}}<br>
                     Suitability score: ${{props.suitability_score == null ? "n/a" : d3.format(".3f")(props.suitability_score)}}<br>
                     Zoning proxy: ${{zoningLabel}}<br>
                     Developed share: ${{zoningProps?.developed_share == null ? "n/a" : d3.format(".0%")(zoningProps.developed_share)}}<br>
+                    Permitting proxy: ${{permittingLabel}}<br>
+                    Permitting evidence count: ${{permittingProps?.evidence_count == null ? "n/a" : permittingProps.evidence_count}}<br>
+                    Social-friction proxy: ${{socialFrictionLabel}}<br>
+                    Social evidence count: ${{socialFrictionProps?.evidence_count == null ? "n/a" : socialFrictionProps.evidence_count}}<br>
                     Hosting proxy: ${{proxyLabel}}<br>
                     Min headroom 2026-2030: ${{hostingProps?.min_margin_headroom_2026_2030 == null ? "n/a" : d3.format(".1f")(hostingProps.min_margin_headroom_2026_2030)}}<br>
                     Assessment area: ${{hostingProps?.assessment_area ?? "n/a"}}<br>
@@ -5296,8 +6324,8 @@ def _write_public_report_suitability_map(
             .html((row) => `
                 <td>${{row.national_rank ?? ""}}</td>
                 <td>
-                    <span class="cell-name">${{row.cell_name ?? `Cell ${{cellKeyFromObject(row)}}`}}</span>
-                    <span class="cell-meta">${{row.cell_name_basis ? `${{row.cell_name_basis}} name` : ""}}</span>
+                    <span class="cell-name">${{displayCellName(row)}}</span>
+                    ${{displayLocalCellName(row) ? `<span class="cell-meta">${{displayLocalCellName(row)}}</span>` : ""}}
                 </td>
                 <td>${{row.suitability_percentile == null ? "" : d3.format(".1f")(row.suitability_percentile)}}</td>
                 <td>${{row.developable_capacity_mw == null ? "" : d3.format(",.0f")(row.developable_capacity_mw)}}</td>
@@ -5309,59 +6337,335 @@ def _write_public_report_suitability_map(
             }}
         }});
 
-            const zoningLayerToggle = d3.select("#zoning-layer-toggle");
+        const zoningLayerToggle = d3.select("#zoning-layer-toggle");
+        const permittingLayerToggle = d3.select("#permitting-layer-toggle");
+        const socialFrictionLayerToggle = d3.select("#social-friction-layer-toggle");
         const hostingLayerToggle = d3.select("#hosting-layer-toggle");
 
         if ((extentSource.features || []).length) {{
             const projection = d3.geoIdentity().reflectY(true);
             projection.fitExtent([[24, 24], [width - 24, height - 24]], extentSource);
             const path = d3.geoPath(projection);
-            const projectedHexPath = (feature, scale = 0.9) => {{
-                const bounds = path.bounds(feature);
+            const median = (values) => {{
+                const clean = values
+                    .filter((value) => Number.isFinite(value) && value > 0)
+                    .sort(d3.ascending);
+                if (!clean.length) {{
+                    return null;
+                }}
+                const middle = Math.floor(clean.length / 2);
+                return clean.length % 2
+                    ? clean[middle]
+                    : (clean[middle - 1] + clean[middle]) / 2;
+            }};
+            const projectedFeatureBounds = features
+                .map((feature) => path.bounds(feature))
+                .filter((bounds) =>
+                    Number.isFinite(bounds[0][0])
+                    && Number.isFinite(bounds[0][1])
+                    && Number.isFinite(bounds[1][0])
+                    && Number.isFinite(bounds[1][1])
+                );
+            const projectedFeatureCenters = features
+                .map((feature) => {{
+                    const centroid = path.centroid(feature);
+                    return {{ feature, centroid }};
+                }})
+                .filter((entry) => Number.isFinite(entry.centroid[0]) && Number.isFinite(entry.centroid[1]));
+            const clusteredPitch = (values, fallback) => {{
+                const sorted = values
+                    .filter((value) => Number.isFinite(value))
+                    .sort(d3.ascending);
+                if (sorted.length < 2) {{
+                    return fallback;
+                }}
+                const clusters = [];
+                sorted.forEach((value) => {{
+                    const previous = clusters[clusters.length - 1];
+                    if (previous == null || Math.abs(value - previous) > 1) {{
+                        clusters.push(value);
+                    }} else {{
+                        clusters[clusters.length - 1] = (previous + value) / 2;
+                    }}
+                }});
+                const deltas = d3.pairs(clusters).map((pair) => Math.abs(pair[1] - pair[0]));
+                return median(deltas) || fallback;
+            }};
+            const sourceGeometryBounds = (geometry) => {{
+                const coordinates = [];
+                const collectCoordinates = (value) => {{
+                    if (!Array.isArray(value)) {{
+                        return;
+                    }}
+                    if (typeof value[0] === "number" && typeof value[1] === "number") {{
+                        coordinates.push(value);
+                        return;
+                    }}
+                    value.forEach(collectCoordinates);
+                }};
+                collectCoordinates(geometry?.coordinates || []);
+                if (!coordinates.length) {{
+                    return null;
+                }}
+                const xValues = coordinates.map((point) => point[0]);
+                const yValues = coordinates.map((point) => point[1]);
+                return [
+                    [d3.min(xValues), d3.min(yValues)],
+                    [d3.max(xValues), d3.max(yValues)],
+                ];
+            }};
+            const sourceFeatureCenter = (feature) => {{
+                const bounds = sourceGeometryBounds(feature.geometry);
+                if (!bounds) {{
+                    return null;
+                }}
+                return [
+                    (bounds[0][0] + bounds[1][0]) / 2,
+                    (bounds[0][1] + bounds[1][1]) / 2,
+                ];
+            }};
+            const pointInRing = (point, ring) => {{
+                let inside = false;
+                for (let index = 0, previousIndex = ring.length - 1; index < ring.length; previousIndex = index++) {{
+                    const current = ring[index];
+                    const previous = ring[previousIndex];
+                    const intersects = ((current[1] > point[1]) !== (previous[1] > point[1]))
+                        && (point[0] < ((previous[0] - current[0]) * (point[1] - current[1])) / (previous[1] - current[1]) + current[0]);
+                    if (intersects) {{
+                        inside = !inside;
+                    }}
+                }}
+                return inside;
+            }};
+            const pointInPolygonCoordinates = (point, polygonCoordinates) => {{
+                if (!polygonCoordinates?.length || !pointInRing(point, polygonCoordinates[0])) {{
+                    return false;
+                }}
+                return !polygonCoordinates.slice(1).some((ring) => pointInRing(point, ring));
+            }};
+            const pointInGeometry = (point, geometry) => {{
+                if (!point || !geometry) {{
+                    return false;
+                }}
+                if (geometry.type === "Polygon") {{
+                    return pointInPolygonCoordinates(point, geometry.coordinates);
+                }}
+                if (geometry.type === "MultiPolygon") {{
+                    return geometry.coordinates.some((polygon) => pointInPolygonCoordinates(point, polygon));
+                }}
+                return false;
+            }};
+            const assignStateCodeForFeature = (feature) => {{
+                const center = sourceFeatureCenter(feature);
+                const state = stateBoundaryFeatures.find((stateFeature) => pointInGeometry(center, stateFeature.geometry));
+                return state?.properties?.state_code || null;
+            }};
+            const buildHexTileMetrics = () => {{
+                const sourceXPitch = clusteredPitch(
+                    projectedFeatureCenters.map((entry) => entry.centroid[0]),
+                    median(projectedFeatureBounds.map((bounds) => Math.abs(bounds[1][0] - bounds[0][0]))) || 8,
+                );
+                const sourceYPitch = clusteredPitch(
+                    projectedFeatureCenters.map((entry) => entry.centroid[1]),
+                    median(projectedFeatureBounds.map((bounds) => Math.abs(bounds[1][1] - bounds[0][1]))) || sourceXPitch,
+                );
+                const sourceXValues = projectedFeatureCenters.map((entry) => entry.centroid[0]);
+                const sourceYValues = projectedFeatureCenters.map((entry) => entry.centroid[1]);
+                const sourceXMin = d3.min(sourceXValues) ?? 0;
+                const sourceXMax = d3.max(sourceXValues) ?? sourceXMin;
+                const sourceYMin = d3.min(sourceYValues) ?? 0;
+                const sourceYMax = d3.max(sourceYValues) ?? sourceYMin;
+                const sourceColumns = projectedFeatureCenters.map((entry) => Math.round((entry.centroid[0] - sourceXMin) / sourceXPitch));
+                const sourceRows = projectedFeatureCenters.map((entry) => Math.round((entry.centroid[1] - sourceYMin) / sourceYPitch));
+                const minColumn = d3.min(sourceColumns) ?? 0;
+                const maxColumn = d3.max(sourceColumns) ?? minColumn;
+                const minRow = d3.min(sourceRows) ?? 0;
+                const maxRow = d3.max(sourceRows) ?? minRow;
+                const metrics = {{ sourceXPitch, sourceYPitch, sourceXMin, sourceYMin }};
+                metrics.radius = Math.max(2.4, metrics.sourceYPitch / Math.sqrt(3));
+                metrics.xPitch = 1.5 * metrics.radius;
+                metrics.yPitch = Math.sqrt(3) * metrics.radius;
+                const displayWidth = Math.max(0, maxColumn - minColumn) * metrics.xPitch;
+                const displayHeight = Math.max(0, maxRow - minRow) * metrics.yPitch + metrics.yPitch / 2;
+                metrics.xOrigin = sourceXMin + ((sourceXMax - sourceXMin) - displayWidth) / 2 - minColumn * metrics.xPitch;
+                metrics.yOrigin = sourceYMin + ((sourceYMax - sourceYMin) - displayHeight) / 2 - minRow * metrics.yPitch;
+                return metrics;
+            }};
+            const hexTileMetrics = buildHexTileMetrics();
+            const honeycombSlotFromCentroid = (centroid, metrics = hexTileMetrics) => {{
+                if (!Number.isFinite(centroid[0]) || !Number.isFinite(centroid[1])) {{
+                    return null;
+                }}
+                const column = Math.round((centroid[0] - metrics.sourceXMin) / metrics.sourceXPitch);
+                const row = Math.round((centroid[1] - metrics.sourceYMin) / metrics.sourceYPitch);
+                return {{ column, row }};
+            }};
+            const honeycombCenterFromSlot = (slot, metrics = hexTileMetrics) => {{
+                const {{ column, row }} = slot;
+                return [
+                    metrics.xOrigin + column * metrics.xPitch,
+                    metrics.yOrigin + row * metrics.yPitch + (Math.abs(column) % 2) * (metrics.yPitch / 2),
+                ];
+            }};
+            const honeycombCenterFromCentroid = (centroid, metrics = hexTileMetrics) => {{
+                const slot = honeycombSlotFromCentroid(centroid, metrics);
+                return slot ? honeycombCenterFromSlot(slot, metrics) : centroid;
+            }};
+            const hexDisplayCentersByKey = new Map();
+            const hexDisplaySlotsByKey = new Map();
+            const cellStateCodeByKey = new Map();
+            projectedFeatureCenters.forEach((entry) => {{
+                const key = cellKeyFromObject(entry.feature.properties || {{}});
+                if (key) {{
+                    const slot = honeycombSlotFromCentroid(entry.centroid, hexTileMetrics);
+                    if (slot) {{
+                        hexDisplaySlotsByKey.set(key, slot);
+                        hexDisplayCentersByKey.set(key, honeycombCenterFromSlot(slot, hexTileMetrics));
+                    }}
+                    cellStateCodeByKey.set(key, assignStateCodeForFeature(entry.feature));
+                }}
+            }});
+            const hexPointsForCenter = (displayCentroid, radius) => [
+                [displayCentroid[0] + radius, displayCentroid[1]],
+                [displayCentroid[0] + radius / 2, displayCentroid[1] + (Math.sqrt(3) * radius) / 2],
+                [displayCentroid[0] - radius / 2, displayCentroid[1] + (Math.sqrt(3) * radius) / 2],
+                [displayCentroid[0] - radius, displayCentroid[1]],
+                [displayCentroid[0] - radius / 2, displayCentroid[1] - (Math.sqrt(3) * radius) / 2],
+                [displayCentroid[0] + radius / 2, displayCentroid[1] - (Math.sqrt(3) * radius) / 2],
+            ];
+            const hexNeighborSlotForEdge = (slot, edgeIndex) => {{
+                const isOddColumn = Math.abs(slot.column) % 2 === 1;
+                const deltas = isOddColumn
+                    ? [[1, 1], [0, 1], [-1, 1], [-1, 0], [0, -1], [1, 0]]
+                    : [[1, 0], [0, 1], [-1, 0], [-1, -1], [0, -1], [1, -1]];
+                const delta = deltas[edgeIndex];
+                return {{ column: slot.column + delta[0], row: slot.row + delta[1] }};
+            }};
+            const slotKey = (slot) => `${{slot.column}}:${{slot.row}}`;
+            const buildHexStateBoundarySegments = () => {{
+                const slotsByKey = new Map();
+                const cellKeysBySlot = new Map();
+                hexDisplaySlotsByKey.forEach((slot, key) => {{
+                    const encodedSlot = slotKey(slot);
+                    slotsByKey.set(encodedSlot, slot);
+                    cellKeysBySlot.set(encodedSlot, key);
+                }});
+                const seenSegments = new Set();
+                const segments = [];
+                const segmentKey = (start, end) => [start, end]
+                    .map((point) => `${{point[0].toFixed(3)}},${{point[1].toFixed(3)}}`)
+                    .sort()
+                    .join("|");
+                hexDisplaySlotsByKey.forEach((slot, key) => {{
+                    const stateCode = cellStateCodeByKey.get(key) || "unassigned";
+                    const center = hexDisplayCentersByKey.get(key);
+                    if (!center) {{
+                        return;
+                    }}
+                    const points = hexPointsForCenter(center, hexTileMetrics.radius);
+                    const edges = [
+                        [points[0], points[1]],
+                        [points[1], points[2]],
+                        [points[2], points[3]],
+                        [points[3], points[4]],
+                        [points[4], points[5]],
+                        [points[5], points[0]],
+                    ];
+                    edges.forEach((edge, edgeIndex) => {{
+                        const neighborSlot = hexNeighborSlotForEdge(slot, edgeIndex);
+                        const neighborKey = cellKeysBySlot.get(slotKey(neighborSlot));
+                        const neighborStateCode = neighborKey ? (cellStateCodeByKey.get(neighborKey) || "unassigned") : "unassigned";
+                        if (stateCode === neighborStateCode) {{
+                            return;
+                        }}
+                        const encodedSegment = segmentKey(edge[0], edge[1]);
+                        if (seenSegments.has(encodedSegment)) {{
+                            return;
+                        }}
+                        seenSegments.add(encodedSegment);
+                        segments.push({{
+                            stateCode,
+                            d: `M${{edge[0][0]}},${{edge[0][1]}}L${{edge[1][0]}},${{edge[1][1]}}`,
+                        }});
+                    }});
+                }});
+                return segments;
+            }};
+            const projectedHexPath = (feature, metrics = hexTileMetrics) => {{
                 const centroid = path.centroid(feature);
-                const cellWidth = Math.max(0, bounds[1][0] - bounds[0][0]);
-                const cellHeight = Math.max(0, bounds[1][1] - bounds[0][1]);
-                if (
-                    !Number.isFinite(centroid[0])
-                    || !Number.isFinite(centroid[1])
-                    || cellWidth <= 0
-                    || cellHeight <= 0
-                ) {{
+                if (!Number.isFinite(centroid[0]) || !Number.isFinite(centroid[1])) {{
                     return path(feature);
                 }}
-                const radius = Math.max(2.4, Math.min(cellWidth / 2, cellHeight / Math.sqrt(3)) * scale);
-                const points = [
-                    [centroid[0] + radius, centroid[1]],
-                    [centroid[0] + radius / 2, centroid[1] + (Math.sqrt(3) * radius) / 2],
-                    [centroid[0] - radius / 2, centroid[1] + (Math.sqrt(3) * radius) / 2],
-                    [centroid[0] - radius, centroid[1]],
-                    [centroid[0] - radius / 2, centroid[1] - (Math.sqrt(3) * radius) / 2],
-                    [centroid[0] + radius / 2, centroid[1] - (Math.sqrt(3) * radius) / 2],
-                ];
+                const key = cellKeyFromObject(feature.properties || {{}});
+                const displayCentroid = hexDisplayCentersByKey.get(key) || honeycombCenterFromCentroid(centroid, metrics);
+                const radius = metrics.radius;
+                const points = hexPointsForCenter(displayCentroid, radius);
                 return "M" + points.map((point) => point[0] + "," + point[1]).join("L") + "Z";
             }};
-            const hexDisplayPath = (feature) => projectedHexPath(feature, 0.88);
+            const hexDisplayPath = (feature) => projectedHexPath(feature, hexTileMetrics);
+            const squareDisplayPath = (feature) => path(feature);
+            let displayMode = "square";
+            const displayPathForMode = (feature) => displayMode === "hex" ? hexDisplayPath(feature) : squareDisplayPath(feature);
+            const displayPathSelections = [];
+            const registerDisplayPathSelection = (selection) => {{
+                displayPathSelections.push(selection);
+                return selection;
+            }};
+            const squareShapeToggle = d3.select("#square-shape-toggle");
+            const hexShapeToggle = d3.select("#hex-shape-toggle");
+            let stateBoundaryPaths = null;
+            let hexStateBoundaryPaths = null;
+            const updateCellDisplayGeometry = () => {{
+                svg.attr("data-display-mode", displayMode);
+                displayPathSelections.forEach((selection) => {{
+                    selection.attr("d", (feature) => displayPathForMode(feature));
+                }});
+                if (stateBoundaryPaths) {{
+                    stateBoundaryPaths.classed("is-display-reference", displayMode === "hex");
+                    stateBoundaryPaths.style("display", displayMode === "hex" ? "none" : null);
+                }}
+                if (hexStateBoundaryPaths) {{
+                    hexStateBoundaryPaths.style("display", displayMode === "hex" ? null : "none");
+                }}
+                squareShapeToggle
+                    .classed("is-active", displayMode === "square")
+                    .attr("aria-pressed", displayMode === "square" ? "true" : "false");
+                hexShapeToggle
+                    .classed("is-active", displayMode === "hex")
+                    .attr("aria-pressed", displayMode === "hex" ? "true" : "false");
+            }};
+            const setDisplayMode = (nextMode) => {{
+                if (!["square", "hex"].includes(nextMode)) {{
+                    return;
+                }}
+                displayMode = nextMode;
+                updateCellDisplayGeometry();
+            }};
+            squareShapeToggle.on("click", () => setDisplayMode("square"));
+            hexShapeToggle.on("click", () => setDisplayMode("hex"));
             const color = d3.scaleSequential()
                 .domain([mapSummary.percentileMin || 0, mapSummary.percentileMax || 100])
                 .interpolator(d3.interpolateViridis);
 
             svg.append("rect")
+                .attr("class", "map-background")
                 .attr("x", 0)
                 .attr("y", 0)
                 .attr("width", width)
                 .attr("height", height)
                 .attr("fill", "rgba(255,255,255,0.42)");
 
-            svg.append("g")
+            const feasiblePaths = svg.append("g")
                 .selectAll("path")
                 .data(feasibleFeatures)
                 .join("path")
                 .attr("class", "feasible-hex")
-                .attr("d", (feature) => hexDisplayPath(feature))
+                .attr("d", (feature) => displayPathForMode(feature))
                 .attr("fill", "#ddd2bf")
                 .attr("stroke", "#f8f6ef")
                 .attr("stroke-width", 0.8)
                 .attr("opacity", 0.7);
+            registerDisplayPathSelection(feasiblePaths);
 
             const suitabilityPaths = svg.append("g")
                 .selectAll("path")
@@ -5369,7 +6673,7 @@ def _write_public_report_suitability_map(
                 .join("path")
                 .attr("class", "suitability-cell suitability-hex")
                 .attr("data-cell-key", (feature) => cellKeyFromObject(feature.properties || {{}}))
-                .attr("d", (feature) => hexDisplayPath(feature))
+                .attr("d", (feature) => displayPathForMode(feature))
                 .attr("fill", (feature) => color(feature.properties?.suitability_percentile ?? mapSummary.percentileMin))
                 .attr("stroke", "rgba(255,255,255,0.92)")
                 .attr("stroke-width", 0.9)
@@ -5382,6 +6686,8 @@ def _write_public_report_suitability_map(
                         props,
                         cellKey,
                         zoningProxyByKey.get(cellKey),
+                        permittingProxyByKey.get(cellKey),
+                        socialFrictionProxyByKey.get(cellKey),
                         hostingProxyByKey.get(cellKey),
                     );
                 }})
@@ -5398,20 +6704,22 @@ def _write_public_report_suitability_map(
                     cellPathsByKey.set(key, d3.select(this));
                 }}
             }});
+            registerDisplayPathSelection(suitabilityPaths);
 
             const zoningProxyGroup = svg.append("g")
                 .attr("class", "zoning-proxy-layer")
                 .style("display", "none");
-            zoningProxyGroup
+            const zoningProxyPaths = zoningProxyGroup
                 .selectAll("path")
                 .data(zoningProxyFeatures)
                 .join("path")
                 .attr("class", "zoning-proxy-cell")
                 .attr("data-cell-key", (feature) => cellKeyFromObject(feature.properties || {{}}))
-                .attr("d", (feature) => hexDisplayPath(feature))
+                .attr("d", (feature) => displayPathForMode(feature))
                 .attr("fill", (feature) => zoningProxyClassColors[feature.properties?.zoning_proxy_class ?? "unknown"])
                 .attr("opacity", 0.28)
                 .attr("stroke", "none");
+            registerDisplayPathSelection(zoningProxyPaths);
             zoningProxyFeatures.forEach((feature) => {{
                 const key = cellKeyFromObject(feature.properties || {{}});
                 if (key) {{
@@ -5433,19 +6741,90 @@ def _write_public_report_suitability_map(
             }});
             syncZoningLayer();
 
+            const permittingProxyGroup = svg.append("g")
+                .attr("class", "permitting-proxy-layer")
+                .style("display", "none");
+            const permittingProxyPaths = permittingProxyGroup
+                .selectAll("path")
+                .data(permittingProxyFeatures)
+                .join("path")
+                .attr("class", "permitting-proxy-cell")
+                .attr("data-cell-key", (feature) => cellKeyFromObject(feature.properties || {{}}))
+                .attr("d", (feature) => displayPathForMode(feature))
+                .attr("fill", (feature) => permittingProxyClassColors[feature.properties?.permitting_proxy_class ?? "unknown"])
+                .attr("opacity", 0.38)
+                .attr("stroke", "none");
+            registerDisplayPathSelection(permittingProxyPaths);
+            permittingProxyFeatures.forEach((feature) => {{
+                const key = cellKeyFromObject(feature.properties || {{}});
+                if (key) {{
+                    permittingProxyByKey.set(key, feature.properties || {{}});
+                }}
+            }});
+
+            let showPermittingProxy = false;
+            const syncPermittingLayer = () => {{
+                permittingProxyGroup.style("display", showPermittingProxy ? null : "none");
+                permittingLayerToggle
+                    .classed("is-active", showPermittingProxy)
+                    .attr("aria-pressed", showPermittingProxy ? "true" : "false")
+                    .text(showPermittingProxy ? "Hide Permitting / Ordinance Proxy" : "Show Permitting / Ordinance Proxy");
+            }};
+            permittingLayerToggle.on("click", () => {{
+                showPermittingProxy = !showPermittingProxy;
+                syncPermittingLayer();
+            }});
+            syncPermittingLayer();
+
+            const socialFrictionProxyGroup = svg.append("g")
+                .attr("class", "social-friction-proxy-layer")
+                .style("display", "none");
+            const socialFrictionProxyPaths = socialFrictionProxyGroup
+                .selectAll("path")
+                .data(socialFrictionProxyFeatures)
+                .join("path")
+                .attr("class", "social-friction-proxy-cell")
+                .attr("data-cell-key", (feature) => cellKeyFromObject(feature.properties || {{}}))
+                .attr("d", (feature) => displayPathForMode(feature))
+                .attr("fill", (feature) => socialFrictionProxyClassColors[feature.properties?.social_friction_proxy_class ?? "unknown"])
+                .attr("opacity", 0.38)
+                .attr("stroke", "none");
+            registerDisplayPathSelection(socialFrictionProxyPaths);
+            socialFrictionProxyFeatures.forEach((feature) => {{
+                const key = cellKeyFromObject(feature.properties || {{}});
+                if (key) {{
+                    socialFrictionProxyByKey.set(key, feature.properties || {{}});
+                }}
+            }});
+
+            let showSocialFrictionProxy = false;
+            const syncSocialFrictionLayer = () => {{
+                socialFrictionProxyGroup.style("display", showSocialFrictionProxy ? null : "none");
+                socialFrictionLayerToggle
+                    .classed("is-active", showSocialFrictionProxy)
+                    .attr("aria-pressed", showSocialFrictionProxy ? "true" : "false")
+                    .text(showSocialFrictionProxy ? "Hide Social-Friction Proxy" : "Show Social-Friction Proxy");
+            }};
+            socialFrictionLayerToggle.on("click", () => {{
+                showSocialFrictionProxy = !showSocialFrictionProxy;
+                syncSocialFrictionLayer();
+            }});
+            syncSocialFrictionLayer();
+
             const hostingProxyGroup = svg.append("g")
                 .attr("class", "hosting-proxy-layer")
                 .style("display", "none");
-            hostingProxyGroup
+            const hostingProxyPaths = hostingProxyGroup
                 .selectAll("path")
                 .data(hostingProxyFeatures)
                 .join("path")
                 .attr("class", "hosting-proxy-cell")
                 .attr("data-cell-key", (feature) => cellKeyFromObject(feature.properties || {{}}))
-                .attr("d", (feature) => hexDisplayPath(feature))
+                .attr("d", (feature) => displayPathForMode(feature))
                 .attr("fill", (feature) => hostingProxyClassColors[feature.properties?.hosting_capacity_proxy_class ?? "unknown"])
                 .attr("opacity", 0.32)
                 .attr("stroke", "none");
+            registerDisplayPathSelection(hostingProxyPaths);
             hostingProxyFeatures.forEach((feature) => {{
                 const key = cellKeyFromObject(feature.properties || {{}});
                 if (key) {{
@@ -5467,7 +6846,7 @@ def _write_public_report_suitability_map(
             }});
             syncHostingLayer();
 
-            svg.append("g")
+            stateBoundaryPaths = svg.append("g")
                 .selectAll("path")
                 .data(stateBoundaryFeatures)
                 .join("path")
@@ -5477,12 +6856,21 @@ def _write_public_report_suitability_map(
                 .attr("stroke", "rgba(31, 41, 39, 0.42)")
                 .attr("stroke-width", 1.1)
                 .attr("stroke-linejoin", "round");
+            hexStateBoundaryPaths = svg.append("g")
+                .attr("class", "hex-state-boundary-layer")
+                .selectAll("path")
+                .data(buildHexStateBoundarySegments())
+                .join("path")
+                .attr("class", "hex-state-boundary")
+                .attr("data-state-code", (segment) => segment.stateCode)
+                .attr("d", (segment) => segment.d);
+            updateCellDisplayGeometry();
         }} else {{
             svg.append("text")
                 .attr("x", width / 2)
                 .attr("y", height / 2)
                 .attr("text-anchor", "middle")
-                .attr("fill", "#5a625a")
+                .attr("fill", "var(--empty-map-text)")
                 .attr("font-size", 18)
                 .text("No feasible suitability cells were available for map export.");
         }}
@@ -5963,6 +7351,16 @@ def _write_public_report_bundle_grid_surfaces(repo_root, output_dir):
         repo_root,
         suitability,
     )
+    permitting_proxy, permitting_proxy_path = _write_public_report_permitting_proxy(
+        output_dir,
+        repo_root,
+        suitability,
+    )
+    social_friction_proxy, social_friction_proxy_path = _write_public_report_social_friction_proxy(
+        output_dir,
+        repo_root,
+        suitability,
+    )
     hosting_proxy, hosting_capacity_proxy_path = _write_public_report_hosting_capacity_proxy(
         output_dir,
         repo_root,
@@ -5976,6 +7374,8 @@ def _write_public_report_bundle_grid_surfaces(repo_root, output_dir):
         ranked_suitability,
         state_boundaries,
         zoning_proxy,
+        permitting_proxy,
+        social_friction_proxy,
         hosting_proxy,
     )
 
@@ -5986,6 +7386,8 @@ def _write_public_report_bundle_grid_surfaces(repo_root, output_dir):
             ranked_suitability_path.as_posix(),
             state_boundary_path.as_posix(),
             zoning_proxy_path.as_posix(),
+            permitting_proxy_path.as_posix(),
+            social_friction_proxy_path.as_posix(),
             hosting_capacity_proxy_path.as_posix(),
             suitability_map_path.as_posix(),
         ]
@@ -6016,6 +7418,7 @@ def run_public_report_bundle(
         shutil.rmtree(output_dir)
 
     output_dir.mkdir(parents=True, exist_ok=True)
+    _write_public_report_bundle_readme(output_dir)
 
     steps = [
         {

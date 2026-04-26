@@ -65,24 +65,14 @@ public-source approximation.
 Keep this section aligned with the open checklist below. When priorities or
 dependencies change, update this order in the same change.
 
-Current recommended next action: resolve the manifest drift in item 35, then
-implement items 32 and 34 so the bounded D3 map gains tracked permitting and
-social-friction layers or explicit bounded proxies for each remaining missing
-report-facing constraint, now that items 31 and 33 have staged coarse zoning and
-hosting-capacity proxy overlays.
+Current recommended next action: pursue true report-parity blockers now that the
+bounded report map and ranked table have cleaner stakeholder-facing labels.
 
 Immediate follow-up order:
 
-1. Resolve manifest drift so the manifest, TODO, and provenance notes agree on the
-      current RIBITS acquisition posture.
-2. Implement item 32, the permitting and ordinance evidence proxy.
-3. Implement item 34, the social-friction proxy.
-4. Revisit item 22 and split bounded-bundle completion from true report-parity
-      follow-up work if needed.
-5. Decide which generated outputs should be committed versus regenerated from
-      tracked commands and small manifests.
-6. Visually QA the D3 suitability map before trusting the map surface.
-7. Then pursue exact-parity blockers, especially Baxtel/schema parity.
+1. Pursue true report-parity blockers, including baseline-year assumptions,
+      utilization handling, grid resolution, exact downscaling rules, and Baxtel
+      suitability-surface parity.
 
 ## Priority 1: Core Blockers
 
@@ -402,7 +392,7 @@ Immediate follow-up order:
       claim, and what conditions must be met before report-equivalent methodology can
       be asserted.
 
-- [ ] 22. Reproduce the report-layer outputs and downscaling assumptions.
+- [x] 22. Complete the bounded public report-layer outputs and downscaling bundle.
       Evidence: the report explicitly presents a feasible-land map, a suitability
       percentile map, and downscaled deployment results through 2050 using a 5.76 km
       grid, an 88% utilization factor, and a maximum 1 GW per site per time-step.
@@ -425,14 +415,19 @@ Immediate follow-up order:
       regional smoke outputs, and a year-summary CSV derived from those time-stepped
       outputs.
       Required outcome: add tracked commands, configs, and validation checks that
-      generate these report outputs from repo-local inputs while making any deviations
-      from the report assumptions explicit. This includes time-stepped outputs that
-      can support cumulative buildout maps or animations.
-      Revisit decision: much of the bounded report-output machinery now exists. Decide
-      whether this item should be marked complete for the bounded public bundle, then
-      create separate follow-up items for true report parity, including the 2025
-      baseline, 88% utilization handling, report-equivalent 5.76 km national grid,
-      Baxtel-trained suitability surface, and exact report downscaling assumptions.
+      generate bounded public report outputs from repo-local inputs while making any
+      deviations from the report assumptions explicit. This includes time-stepped
+      outputs that can support cumulative buildout maps or animations.
+      Outcome: completed for the bounded public bundle. The repo now generates the
+      report-facing bundle through
+      `python -m reVeal.public_data run-public-report-bundle --output-dir external-data/derived/report-bundle`,
+      writes machine-readable status, manifest, assumption-registry, limitations,
+      ranked-suitability, feasible-land, suitability-percentile, cumulative-buildout,
+      year-summary, and ReEDS handoff artifacts, and documents the remaining
+      deviations from report parity in
+      `external-data/provenance/report-output-bounded-public-bundle.md`. True
+      report-parity work is split into separate open follow-up items rather than
+      hidden inside this bounded-bundle item.
 
 - [x] 23. Integrate the additional requirements from the LinkedIn Part I and Part II
       descriptions.
@@ -571,7 +566,7 @@ Immediate follow-up order:
       proxy`, and regression-tests the new artifact and map contract in
       `tests/test_public_data.py`.
 
-- [ ] 32. Add a permitting layer or bounded permitting proxy to the report-bundle map surface.
+- [x] 32. Add a permitting layer or bounded permitting proxy to the report-bundle map surface.
       Evidence: the current quick-read note and limitations explicitly say the
       bounded map does not add permitting information.
       Required outcome: define the source or bounded proxy decision for permitting,
@@ -582,6 +577,13 @@ Immediate follow-up order:
       staged CSV or GeoPackage manifest, generate
       `public_report_permitting_proxy.gpkg`, add a D3 map toggle, update the
       assumption registry, limitations note, provenance, and tests.
+      Outcome: completed. The bounded report bundle now reads staged
+      `external-data/manifest/permitting-ordinance-evidence.csv` rows, assigns
+      public evidence points to execution-grid cells, writes
+      `public_report_permitting_proxy.gpkg`, exposes a `Permitting / Ordinance
+      Proxy` toggle in the D3 page, updates the carried limitation posture to
+      `bounded proxy`, and regression-tests the artifact, map contract, and proxy
+      classes in `tests/test_public_data.py`.
 
 - [x] 33. Add a hosting-capacity layer or bounded hosting-capacity proxy to the report-bundle map surface.
       Evidence: the current quick-read note and limitations explicitly say the
@@ -598,7 +600,7 @@ Immediate follow-up order:
       map while keeping the limitation explicit that this is not local transmission
       hosting-capacity headroom.
 
-- [ ] 34. Add a social-friction layer or bounded social-friction proxy to the report-bundle map surface.
+- [x] 34. Add a social-friction layer or bounded social-friction proxy to the report-bundle map surface.
       Evidence: the current quick-read note and limitations explicitly say the
       bounded map does not add social-acceptance information.
       Required outcome: define the source or bounded proxy decision for social
@@ -606,20 +608,32 @@ Immediate follow-up order:
       report-bundle map and provenance so the limitation is either reduced or made
       explicit at the layer level. Be explicit that this is a social-friction proxy,
       not a claim to measure actual social acceptance.
-      Practical path: use manually curated public evidence such as moratoria,
-      ordinance restrictions, local opposition records, public hearing outcomes, or
-      planning-board signals. Wire it into the same bundle, map, test, and provenance
-      pattern as zoning and hosting capacity.
+      Practical path: use manually curated public evidence such as local opposition
+      records, public hearing outcomes, civic organization objections, appeal
+      records, or news-documented siting conflicts. Wire it into the same bundle,
+      map, test, and provenance pattern as zoning, permitting, and hosting capacity.
+      Outcome: completed. The bounded report bundle now reads staged
+      `external-data/manifest/social-friction-evidence.csv` rows, assigns public
+      evidence points to execution-grid cells, writes
+      `public_report_social_friction_proxy.gpkg`, exposes a `Social-Friction Proxy`
+      toggle in the D3 page, updates the carried limitation posture to `bounded
+      proxy`, and regression-tests the artifact, map contract, and proxy classes in
+      `tests/test_public_data.py`. The provenance note is explicit that this is a
+      social-friction evidence proxy, not a measurement of actual social acceptance.
 
-- [ ] 35. Resolve manifest drift for the RIBITS acquisition posture.
-      Evidence: `external-data/manifest/gap-register.csv` still describes RIBITS as
-      `manual-only-workflow-defined`, while this checklist and the provenance notes
-      now say it has a scripted ORDS workflow.
+- [x] 35. Resolve manifest drift for the RIBITS acquisition posture.
+      Evidence: `external-data/manifest/gap-register.csv` previously described
+      RIBITS as `manual-only-workflow-defined`, while this checklist and the
+      provenance notes said it had a scripted ORDS workflow.
       Required outcome: update the gap register or make the distinction explicit so
       the manifest, TODO, and provenance records agree. This is small, but it matters
       because the repo is becoming a traceability system.
+      Outcome: completed. The gap register now describes RIBITS as a scripted public
+      webservice workflow through the ORDS `bank_site_list` and `bank_site_data`
+      endpoints, and reframes the remaining blocker as the downstream transform from
+      staged snapshot to report-aligned exclusion-layer geometry.
 
-- [ ] 36. Decide the version-control policy for generated report-bundle outputs.
+- [x] 36. Decide the version-control policy for generated report-bundle outputs.
       Evidence: the report-bundle status confirms generated outputs are complete in
       `external-data/derived/report-bundle/public_report_bundle_status.json`, but the
       HTML map is large and several derived GeoPackages and CSVs are generated
@@ -627,23 +641,125 @@ Immediate follow-up order:
       Required outcome: decide what should be committed versus regenerated from
       commands. Prefer tracked commands plus small manifests over large generated
       blobs unless the artifact itself is part of the deliverable.
+      Outcome: completed. The repo now treats the report bundle as a regenerated
+      local deliverable rather than tracked source. Commit source code, regression
+      tests, schema-only evidence manifests, provenance notes, usage docs, Sphinx
+      docs, and the report-bundle README policy. Regenerate the HTML report,
+      GeoPackages, output JSON, generated Markdown, ranked CSV, cumulative summary,
+      cache payloads, and regenerated NERC GeoPackages from tracked commands when
+      needed.
 
-- [ ] 37. Visually QA the D3 suitability map surface.
+- [x] 37. Visually QA the D3 suitability map surface.
       Evidence: `external-data/derived/report-bundle/public_report_suitability_map.html`
-      now includes base suitability cells, state boundaries, optional zoning and
-      hosting overlays, ranked-table hover behavior, and display-only hexagons.
+      now includes base suitability cells, state boundaries, optional zoning,
+      permitting, social-friction, and hosting overlays, ranked-table hover behavior,
+      and display-only hexagons.
       Required outcome: open the generated map and verify that base cells render,
-      state boundaries render, the zoning toggle works, the hosting toggle works,
-      ranked-table hover highlights the correct cell, and text does not overlap.
+      state boundaries render, the zoning toggle works, the permitting toggle works,
+      the social-friction toggle works, the hosting toggle works, ranked-table hover
+      highlights the correct cell, and text does not overlap.
+      Outcome: completed. Browser inspection verified that the generated report page
+      renders the base map, contextual layer controls, ranked-cell table, and tooltip
+      content, and surfaced the known display issue that the per-cell fitted hexes did
+      not tile coherently.
 
-- [ ] 38. Pursue exact-parity blockers after the bounded proxy backlog is stable.
+- [x] 38. Fix the report-map hexagon tiling geometry.
+      Evidence: visual inspection of
+      `external-data/derived/report-bundle/public_report_suitability_map.html` shows
+      the display-only hexagons are not tiled correctly, even though the grid remains
+      the internal model.
+      Required outcome: correct the D3 display geometry so the hexagons tile
+      coherently over the grid-backed suitability cells, preserve stable cell IDs and
+      hover behavior, document the display-only nature of the hex layer, and add a
+      regression check that would catch the observed tiling defect.
+      Outcome: completed. The D3 generator now computes shared honeycomb tile
+      metrics from the projected suitability surface, assigns cells to staggered
+      display row/column slots, and reuses the same display center across the
+      feasible, suitability, zoning, permitting, social-friction, and hosting layers.
+      The original grid geometries and stable cell IDs remain the internal model, and
+      the report-bundle regression now checks for the staggered honeycomb contract.
+      The generated report also now exposes a Squares/Hexes display switch so state
+      boundaries can be reviewed against geographically aligned source-cell geometry
+      while still preserving the honeycomb scan view. Hex mode now uses snapped
+      state-boundary outlines built from hex-cell edges, so the boundary context
+      lines up with the honeycomb display instead of crossing repositioned cells.
+
+- [x] 39. Add a dark, light, and system mode switcher to the generated HTML report.
+      Evidence: the generated D3 suitability map currently has one fixed visual theme,
+      which limits readability across room lighting, projector settings, and user
+      accessibility preferences.
+      Required outcome: add a visible theme control with dark, light, and system
+      options; persist the explicit user choice for the local report when practical;
+      default to system preference when no explicit choice exists; and verify that
+      map fills, overlays, legends, table rows, hover highlights, and tooltips remain
+      readable in all three modes.
+      Outcome: completed. The generated D3 report now exposes a System/Light/Dark
+      theme control, stores the selected mode in local storage when available,
+      defaults to system preference when no explicit mode is set, and resolves CSS
+      variables for map background, panels, controls, table rows, state outlines,
+      active highlights, and tooltips across light and dark themes.
+
+- [ ] 40. Define the report-parity baseline year and buildout horizon assumptions.
+      Evidence: the bounded public bundle can emit cumulative buildout products, but
+      the report-parity baseline and time horizon are still recorded as deviations
+      rather than implemented assumptions.
+      Required outcome: identify the report-equivalent baseline year, modeled years,
+      existing-data-center starting stock, and cumulative-buildout horizon; encode
+      those assumptions in tracked config or metadata; and update the bounded bundle
+      only when the assumptions can be validated against report requirements.
+
+- [ ] 41. Implement report-parity utilization and per-site capacity constraints.
+      Evidence: the report references an 88% utilization factor and a maximum 1 GW per
+      site per time-step, while the bounded public bundle currently documents these as
+      parity gaps.
+      Required outcome: implement configurable utilization and per-site/time-step
+      capacity constraints in the report-output workflow, add validation coverage, and
+      keep the limitation explicit if exact report semantics cannot be recovered.
+
+- [ ] 42. Evaluate and implement report-equivalent national grid resolution.
+      Evidence: the report references a 5.76 km grid and LinkedIn text references a
+      5 km aggregation surface, while the bounded public bundle currently uses the
+      repo's existing execution grid.
+      Required outcome: determine the correct report-equivalent grid contract,
+      generate or document the national grid needed for parity, preserve stable cell
+      IDs, and validate that downstream map, ranked-table, and downscaling outputs use
+      the intended spatial footprint.
+
+- [ ] 43. Implement exact report downscaling allocation assumptions where recoverable.
+      Evidence: the bounded public bundle distributes public smoke-test EER outputs
+      onto the current suitability surface, but the report's exact allocation rules are
+      not yet proven equivalent.
+      Required outcome: recover, encode, and test the report-aligned allocation rules
+      for regional EER projections, cumulative buildout, and time-stepped outputs; if
+      the exact assumptions remain unavailable, document the non-equivalence as an
+      explicit parity blocker.
+
+- [ ] 44. Obtain Baxtel schema evidence and decide the trained-suitability parity path.
       Evidence: the largest remaining strategic blocker is still Baxtel/schema
       parity. The repo has a procurement path, but exact reproduction remains blocked
       until a sample or licensed schema is obtained and compared against the public
       baseline.
       Required outcome: obtain a sample or licensed Baxtel schema, compare it against
-      the public baseline, and use that comparison to decide what exact-parity work is
-      feasible versus what must remain explicitly non-equivalent.
+      the public baseline, and use that comparison to decide whether the
+      report-aligned Baxtel-trained suitability surface is feasible or must remain
+      explicitly non-equivalent.
+
+- [x] 45. Fix the generated name labels for report-bundle cells.
+      Evidence: the bounded report-bundle map and ranked-cell table now expose
+      human-readable cell labels, but some labels can be operationally confusing in
+      places with complex geography, nearby gateway cities, or distant fallback
+      anchors.
+      Required outcome: review the current `cell_name`, `base_cell_name`, naming
+      basis, anchor-place, and candidate-feature fields; tighten the naming and
+      disambiguation rules so labels are clear, local, and stable; document the
+      revised rule; and regression-test the ranked CSV and D3 map label contract.
+      Outcome: reopened and completed with a geographic identity-stack model. The
+      bounded naming workflow now emits stable unique row labels plus
+      `local_cell_name`, `general_american_cell_name`, and `identity_stack_json`.
+      The D3 ranked table uses the general American label as the primary display
+      layer and shows local identity as secondary context when useful. Basis,
+      match scope, and stack metadata remain in output fields and the cell tooltip
+      rather than visible suffixes like `metro name` or `natural name`.
 
 ## Ongoing Rule
 

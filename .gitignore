@@ -163,3 +163,9 @@ external-data/raw/
 external-data/unpacked/
 external-data/examples/
 external-data/derived/eer/downscale-smoke/*.gpkg
+
+# Regenerated report-output artifacts
+external-data/derived/report-bundle/**
+!external-data/derived/report-bundle/
+!external-data/derived/report-bundle/README.md
+external-data/derived/nerc/*.gpkg

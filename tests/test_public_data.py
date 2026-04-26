@@ -22,6 +22,7 @@ from reVeal.public_data import (
     PUBLIC_DATASET_CATALOG,
     _annotate_public_report_cell_names,
     _build_public_report_feasible_land_frame,
+    _build_public_report_suitability_percentile_frame,
     assess_public_eer_drop_in_compatibility,
     build_state_gas_service_territory_frame,
     build_state_water_availability_proxy_tables,
@@ -1017,10 +1018,10 @@ def test_stage_public_dataset_can_resume_partial_download(tmp_path, monkeypatch)
     assert captured["range"] == "bytes=6-"
 
 
-def test_build_public_report_feasible_land_frame_excludes_nlcd_water_and_wetlands(
+def test_build_public_report_feasible_land_frame_retains_and_clamps_nlcd_water_and_wetlands(
     tmp_path,
 ):
-    """Bounded feasible land should drop NLCD water and wetland dominated cells."""
+    """Bounded feasible land should retain water/wetland cells and clamp their percentile."""
 
     nlcd_target_path = tmp_path / "external-data/raw/nlcd/Annual_NLCD_LndCov_2023_CU_C1V0.tif"
     nlcd_target_path.parent.mkdir(parents=True, exist_ok=True)
@@ -1056,10 +1057,17 @@ def test_build_public_report_feasible_land_frame_excludes_nlcd_water_and_wetland
     )
 
     feasible = _build_public_report_feasible_land_frame(tmp_path, frame)
+    suitability = _build_public_report_suitability_percentile_frame(feasible)
 
-    assert feasible["sc_point_gid"].tolist() == [3]
-    assert feasible["is_feasible_land"].tolist() == [True]
-    assert feasible["water_wetland_share"].tolist() == [pytest.approx(0.0)]
+    assert feasible["sc_point_gid"].tolist() == [1, 2, 3]
+    assert feasible["is_feasible_land"].tolist() == [True, True, True]
+    assert feasible["water_wetland_share"].tolist() == [
+        pytest.approx(1.0),
+        pytest.approx(1.0),
+        pytest.approx(0.0),
+    ]
+    assert feasible["water_wetland_excluded"].tolist() == [True, True, False]
+    assert suitability["suitability_percentile"].tolist() == [0.0, 0.0, 83.333333]
 
 
 def test_assess_public_eer_drop_in_compatibility_marks_workbook_as_transform_only():
@@ -1863,8 +1871,8 @@ def test_main_summarize_public_workflow_status_reports_fit_and_gaps(tmp_path, ca
     assert "XLSX workbook" in stdout_text
 
 
-def test_annotate_public_report_cell_names_selects_more_popular_candidate():
-    """Cell naming should keep both candidate lookups and choose the higher-score label."""
+def test_annotate_public_report_cell_names_prefers_in_cell_populated_place():
+    """Cell naming should prefer in-cell populated places over natural anchors."""
 
     frame = gpd.GeoDataFrame(
         {
@@ -1913,11 +1921,202 @@ def test_annotate_public_report_cell_names_selects_more_popular_candidate():
         ],
     )
 
-    assert named["cell_name"].tolist() == ["Metro Alpha", "Canyon Beta"]
-    assert named["cell_name_basis"].tolist() == ["metro", "natural"]
+    assert named["cell_name"].tolist() == ["Metro Alpha", "Metro Beta"]
+    assert named["cell_name_basis"].tolist() == ["metro", "metro"]
+    assert named["cell_name_match_scope"].tolist() == ["in_cell", "in_cell"]
     assert named["metro_feature_name"].tolist() == ["Metro Alpha", "Metro Beta"]
     assert named["natural_feature_name"].tolist() == ["Lake Alpha", "Canyon Beta"]
-    assert named["cell_name_popularity_score"].tolist() == [pytest.approx(92.0), pytest.approx(88.0)]
+    assert named["cell_name_popularity_score"].tolist() == [pytest.approx(92.0), pytest.approx(61.0)]
+
+
+def test_annotate_public_report_cell_names_prefers_nearest_metro_before_natural_anchor():
+    """Cells without an in-cell populated place should prefer nearest metro/city labels."""
+
+    frame = gpd.GeoDataFrame(
+        {
+            "sc_point_gid": [101],
+            "latitude": [0.5],
+            "longitude": [0.5],
+        },
+        geometry=[box(0.0, 0.0, 1.0, 1.0)],
+        crs="EPSG:4326",
+    )
+
+    named = _annotate_public_report_cell_names(
+        frame,
+        place_catalog=[
+            {
+                "name": "Metro Near",
+                "kind": "metro",
+                "latitude": 1.2,
+                "longitude": 0.5,
+                "popularity_score": 10.0,
+            },
+            {
+                "name": "Canyon Inside",
+                "kind": "natural",
+                "latitude": 0.5,
+                "longitude": 0.5,
+                "popularity_score": 99.0,
+            },
+        ],
+    )
+
+    assert named["cell_name"].tolist() == ["Metro Near"]
+    assert named["cell_name_basis"].tolist() == ["metro"]
+    assert named["cell_name_match_scope"].tolist() == ["nearest_catalog_fallback"]
+    assert named["natural_feature_name"].tolist() == ["Canyon Inside"]
+    assert named["natural_feature_match_scope"].tolist() == ["in_cell"]
+
+
+def test_annotate_public_report_cell_names_adds_audience_identity_stack():
+    """Cell naming should expose local and general-audience identity layers."""
+
+    frame = gpd.GeoDataFrame(
+        {
+            "sc_point_gid": [101],
+            "latitude": [34.14],
+            "longitude": [-118.04],
+        },
+        geometry=[box(-118.08, 34.10, -118.00, 34.18)],
+        crs="EPSG:4326",
+    )
+
+    named = _annotate_public_report_cell_names(
+        frame,
+        place_catalog=[
+            {
+                "name": "Los Angeles",
+                "kind": "metro",
+                "latitude": 34.0522,
+                "longitude": -118.2437,
+                "popularity_score": 98.0,
+            },
+            {
+                "name": "San Gabriel Mountains",
+                "kind": "natural",
+                "latitude": 34.25,
+                "longitude": -118.10,
+                "popularity_score": 75.0,
+            },
+        ],
+        place_anchor_catalog=[
+            {
+                "name": "Arcadia",
+                "latitude": 34.1397,
+                "longitude": -118.0353,
+                "county": "Los Angeles County",
+                "state": "CA",
+                "popularity_score": 55.0,
+            },
+        ],
+    )
+
+    identity_stack = json.loads(named.loc[0, "identity_stack_json"])
+
+    assert named["local_cell_name"].tolist() == ["Arcadia"]
+    assert named["local_cell_name_layer"].tolist() == ["city"]
+    assert named["general_american_cell_name"].tolist() == ["near Los Angeles, California"]
+    assert named["general_american_cell_name_layer"].tolist() == ["metro_area"]
+    assert [item["layer"] for item in identity_stack] == [
+        "exact_point",
+        "landmark_or_address",
+        "neighborhood",
+        "district",
+        "city",
+        "county",
+        "metro_area",
+        "state_region",
+        "state",
+        "national_region",
+        "country",
+    ]
+    assert {item["layer"]: item["name"] for item in identity_stack} == {
+        "exact_point": "34.140, -118.040",
+        "landmark_or_address": "San Gabriel Mountains",
+        "neighborhood": None,
+        "district": None,
+        "city": "Arcadia",
+        "county": "Los Angeles County",
+        "metro_area": "Los Angeles",
+        "state_region": "Southern California",
+        "state": "California",
+        "national_region": "West Coast",
+        "country": "United States",
+    }
+
+
+def test_annotate_public_report_cell_names_uses_state_layer_when_metro_is_too_far():
+    """General-audience labels should move up the stack when the nearest metro is distant."""
+
+    frame = gpd.GeoDataFrame(
+        {
+            "sc_point_gid": [101],
+            "latitude": [31.0],
+            "longitude": [-101.0],
+        },
+        geometry=[box(-101.1, 30.9, -100.9, 31.1)],
+        crs="EPSG:4326",
+    )
+
+    named = _annotate_public_report_cell_names(
+        frame,
+        place_catalog=[
+            {
+                "name": "Houston",
+                "kind": "metro",
+                "latitude": 29.7604,
+                "longitude": -95.3698,
+                "popularity_score": 90.0,
+            },
+        ],
+        place_anchor_catalog=[
+            {
+                "name": "Ozona",
+                "latitude": 30.7102,
+                "longitude": -101.2007,
+                "county": "Crockett County",
+                "state": "TX",
+                "popularity_score": 20.0,
+            },
+        ],
+    )
+
+    assert named["local_cell_name"].tolist() == ["Ozona"]
+    assert named["general_american_cell_name"].tolist() == ["Texas"]
+    assert named["general_american_cell_name_layer"].tolist() == ["state"]
+    assert named["metro_feature_distance_miles"].iloc[0] > 125.0
+
+
+def test_annotate_public_report_cell_names_uses_natural_anchor_without_metro_candidate():
+    """Natural or regional anchors should remain the fallback when no city candidate exists."""
+
+    frame = gpd.GeoDataFrame(
+        {
+            "sc_point_gid": [101],
+            "latitude": [0.5],
+            "longitude": [0.5],
+        },
+        geometry=[box(0.0, 0.0, 1.0, 1.0)],
+        crs="EPSG:4326",
+    )
+
+    named = _annotate_public_report_cell_names(
+        frame,
+        place_catalog=[
+            {
+                "name": "Canyon Inside",
+                "kind": "natural",
+                "latitude": 0.5,
+                "longitude": 0.5,
+                "popularity_score": 99.0,
+            },
+        ],
+    )
+
+    assert named["cell_name"].tolist() == ["Canyon Inside"]
+    assert named["cell_name_basis"].tolist() == ["natural"]
+    assert named["cell_name_match_scope"].tolist() == ["in_cell"]
 
 
 def test_annotate_public_report_cell_names_handles_projected_geometry():
@@ -1958,8 +2157,54 @@ def test_annotate_public_report_cell_names_handles_projected_geometry():
     assert named["metro_feature_match_scope"].tolist() == ["in_cell"]
 
 
-def test_annotate_public_report_cell_names_prefers_gateway_anchor_for_natural_base_name():
-    """Natural-feature labels should anchor to the mapped gateway place instead of a nearer metro."""
+def test_annotate_public_report_cell_names_replaces_projected_coordinate_columns():
+    """Projected coordinate columns should not drive nearest-place label matching."""
+
+    frame = gpd.GeoDataFrame(
+        {
+            "sc_point_gid": [303],
+        },
+        geometry=[box(-105.2, 39.8, -104.8, 40.2)],
+        crs="EPSG:4326",
+    ).to_crs("EPSG:3857")
+    frame["latitude"] = frame.geometry.centroid.y
+    frame["longitude"] = frame.geometry.centroid.x
+
+    named = _annotate_public_report_cell_names(
+        frame,
+        place_catalog=[
+            {
+                "name": "Metro Correct",
+                "kind": "metro",
+                "latitude": 40.25,
+                "longitude": -105.25,
+                "popularity_score": 50.0,
+            },
+            {
+                "name": "Metro Wrong",
+                "kind": "metro",
+                "latitude": 89.0,
+                "longitude": -179.0,
+                "popularity_score": 99.0,
+            },
+            {
+                "name": "Ridge Correct",
+                "kind": "natural",
+                "latitude": 40.35,
+                "longitude": -105.35,
+                "popularity_score": 80.0,
+            },
+        ],
+    )
+
+    assert named["cell_name"].tolist() == ["Metro Correct"]
+    assert named["cell_name_match_scope"].tolist() == ["nearest_catalog_fallback"]
+    assert named["latitude"].tolist() == [pytest.approx(40.0, abs=0.01)]
+    assert named["longitude"].tolist() == [pytest.approx(-105.0, abs=0.01)]
+
+
+def test_annotate_public_report_cell_names_prefers_gateway_anchor_for_natural_fallback():
+    """Natural fallback labels should anchor to the mapped gateway place instead of a nearer city."""
 
     frame = gpd.GeoDataFrame(
         {
@@ -1974,13 +2219,6 @@ def test_annotate_public_report_cell_names_prefers_gateway_anchor_for_natural_ba
     named = _annotate_public_report_cell_names(
         frame,
         place_catalog=[
-            {
-                "name": "Atlanta",
-                "kind": "metro",
-                "latitude": 33.7490,
-                "longitude": -84.3880,
-                "popularity_score": 87.0,
-            },
             {
                 "name": "Great Smoky Mountains",
                 "kind": "natural",
@@ -2103,11 +2341,14 @@ def test_run_public_report_bundle_writes_manifest_and_deviation_note(tmp_path, m
     ranked_suitability_path = bundle_dir / "public_report_suitability_ranked_cells.csv"
     state_boundary_path = bundle_dir / "public_report_state_boundaries.gpkg"
     hosting_capacity_proxy_path = bundle_dir / "public_report_hosting_capacity_proxy.gpkg"
+    permitting_proxy_path = bundle_dir / "public_report_permitting_proxy.gpkg"
+    social_friction_proxy_path = bundle_dir / "public_report_social_friction_proxy.gpkg"
     zoning_proxy_path = bundle_dir / "public_report_zoning_proxy.gpkg"
     suitability_map_path = bundle_dir / "public_report_suitability_map.html"
     assumption_registry_path = bundle_dir / "public_report_assumption_registry.json"
     limitations_path = bundle_dir / "public_report_limitations.md"
     reeds_contract_path = bundle_dir / "public_report_reeds_integration_contract.json"
+    bundle_readme_path = bundle_dir / "README.md"
 
     grid_path.parent.mkdir(parents=True, exist_ok=True)
     regions_path.parent.mkdir(parents=True, exist_ok=True)
@@ -2211,6 +2452,7 @@ def test_run_public_report_bundle_writes_manifest_and_deviation_note(tmp_path, m
     nlcd_target_path = tmp_path / "external-data/raw/nlcd/Annual_NLCD_LndCov_2023_CU_C1V0.tif"
     nlcd_target_path.parent.mkdir(parents=True, exist_ok=True)
     nlcd_data = np.full((14, 14), 81, dtype=np.uint8)
+    nlcd_data[11:13, 1:3] = 11
     nlcd_data[6:8, 6:8] = 22
     nlcd_data[1:3, 11:13] = 24
     with rasterio.open(
@@ -2226,6 +2468,67 @@ def test_run_public_report_bundle_writes_manifest_and_deviation_note(tmp_path, m
         nodata=0,
     ) as dataset:
         dataset.write(nlcd_data, 1)
+
+    permitting_manifest_path = tmp_path / "external-data/manifest/permitting-ordinance-evidence.csv"
+    permitting_manifest_path.parent.mkdir(parents=True, exist_ok=True)
+    pd.DataFrame(
+        [
+            {
+                "evidence_id": "permit-001",
+                "jurisdiction_name": "Alpha County",
+                "state": "AA",
+                "evidence_type": "moratorium",
+                "friction_level": "high",
+                "latitude": 39.5,
+                "longitude": -105.5,
+                "source_url": "https://example.com/alpha-moratorium",
+                "source_date": "2026-01-15",
+                "summary": "Temporary moratorium on data center permitting.",
+            },
+            {
+                "evidence_id": "permit-002",
+                "jurisdiction_name": "Beta Planning Board",
+                "state": "BB",
+                "evidence_type": "planning_board_signal",
+                "friction_level": "moderate",
+                "latitude": 40.0,
+                "longitude": -105.0,
+                "source_url": "https://example.com/beta-hearing",
+                "source_date": "2026-02-20",
+                "summary": "Planning board hearing records note public siting concerns.",
+            },
+        ]
+    ).to_csv(permitting_manifest_path, index=False)
+
+    social_friction_manifest_path = tmp_path / "external-data/manifest/social-friction-evidence.csv"
+    pd.DataFrame(
+        [
+            {
+                "evidence_id": "social-001",
+                "community_name": "Alpha Residents Coalition",
+                "state": "AA",
+                "evidence_type": "organized_opposition",
+                "friction_level": "high",
+                "latitude": 39.5,
+                "longitude": -105.5,
+                "source_url": "https://example.com/alpha-opposition",
+                "source_date": "2026-03-10",
+                "summary": "Residents coalition submitted organized opposition to a proposed data center.",
+            },
+            {
+                "evidence_id": "social-002",
+                "community_name": "Beta Civic Forum",
+                "state": "BB",
+                "evidence_type": "public_hearing_concern",
+                "friction_level": "moderate",
+                "latitude": 40.0,
+                "longitude": -105.0,
+                "source_url": "https://example.com/beta-concern",
+                "source_date": "2026-03-17",
+                "summary": "Public hearing comments raised water and noise concerns.",
+            },
+        ]
+    ).to_csv(social_friction_manifest_path, index=False)
 
     gpd.GeoDataFrame(
         {
@@ -2321,11 +2624,15 @@ def test_run_public_report_bundle_writes_manifest_and_deviation_note(tmp_path, m
     assert ranked_suitability_path.exists()
     assert state_boundary_path.exists()
     assert hosting_capacity_proxy_path.exists()
+    assert permitting_proxy_path.exists()
+    assert social_friction_proxy_path.exists()
     assert zoning_proxy_path.exists()
     assert suitability_map_path.exists()
     assert assumption_registry_path.exists()
     assert limitations_path.exists()
     assert reeds_contract_path.exists()
+    assert bundle_readme_path.exists()
+    assert "regenerated deliverables" in bundle_readme_path.read_text()
     assert total_cumulative_path.exists()
     assert regional_cumulative_path.exists()
     assert summary_path.exists()
@@ -2342,6 +2649,8 @@ def test_run_public_report_bundle_writes_manifest_and_deviation_note(tmp_path, m
     assert ranked_suitability_path.as_posix() in manifest["output_paths"]
     assert state_boundary_path.as_posix() in manifest["output_paths"]
     assert hosting_capacity_proxy_path.as_posix() in manifest["output_paths"]
+    assert permitting_proxy_path.as_posix() in manifest["output_paths"]
+    assert social_friction_proxy_path.as_posix() in manifest["output_paths"]
     assert zoning_proxy_path.as_posix() in manifest["output_paths"]
     assert suitability_map_path.as_posix() in manifest["output_paths"]
     assert assumption_registry_path.as_posix() in manifest["output_paths"]
@@ -2359,9 +2668,9 @@ def test_run_public_report_bundle_writes_manifest_and_deviation_note(tmp_path, m
     assert assumption_registry["report_reference"]["utilization_factor"] == 0.88
     assert assumption_registry["current_bundle"]["baseline_year"] == 2022
     assert assumption_registry["current_bundle"]["feasible_land_rule"] == (
-        "developable_capacity_mw > 0 and NLCD water/wetland share across classes 11, 90, and 95 < 0.5"
+        "developable_capacity_mw > 0; cells with NLCD water/wetland share across classes 11, 90, and 95 >= 0.5 are retained and clamped to 0 suitability percentile"
     )
-    assert assumption_registry["current_bundle"]["suitability_percentile_rule"] == "percentile rank of suitability_score across feasible cells"
+    assert assumption_registry["current_bundle"]["suitability_percentile_rule"] == "percentile rank of suitability_score across developable cells, with water/wetland-excluded cells clamped to 0"
     assert assumption_registry["current_bundle"]["ranked_summary_rule"] == "sort by suitability_percentile desc, suitability_score desc, developable_capacity_mw desc, sc_point_gid asc"
     assert [item["projection_resolution"] for item in assumption_registry["scenario_inputs"]] == ["total", "regional"]
     assert assumption_registry["scenario_inputs"][0]["max_site_addition_per_year_mw"] == 1000
@@ -2371,6 +2680,8 @@ def test_run_public_report_bundle_writes_manifest_and_deviation_note(tmp_path, m
     assert "public_report_suitability_ranked_cells" in output_labels
     assert "public_report_state_boundaries" in output_labels
     assert "public_report_hosting_capacity_proxy" in output_labels
+    assert "public_report_permitting_proxy" in output_labels
+    assert "public_report_social_friction_proxy" in output_labels
     assert "public_report_zoning_proxy" in output_labels
     assert "public_report_suitability_map" in output_labels
 
@@ -2380,25 +2691,73 @@ def test_run_public_report_bundle_writes_manifest_and_deviation_note(tmp_path, m
     assert "suitabilityGeoJson" in suitability_map_html
     assert "stateBoundaryGeoJson" in suitability_map_html
     assert "hostingProxyGeoJson" in suitability_map_html
+    assert "permittingProxyGeoJson" in suitability_map_html
+    assert "socialFrictionProxyGeoJson" in suitability_map_html
     assert "zoningProxyGeoJson" in suitability_map_html
     assert "rankedRows" in suitability_map_html
     assert "data-cell-key" in suitability_map_html
     assert "setActiveCellKey" in suitability_map_html
+    assert "square-shape-toggle" in suitability_map_html
+    assert "hex-shape-toggle" in suitability_map_html
+    assert "theme-control" in suitability_map_html
+    assert "light-theme-toggle" in suitability_map_html
+    assert "dark-theme-toggle" in suitability_map_html
+    assert "system-theme-toggle" in suitability_map_html
+    assert "reveal-report-theme" in suitability_map_html
+    assert "data-theme-mode" in suitability_map_html
+    assert "data-theme" in suitability_map_html
+    assert "prefers-color-scheme: dark" in suitability_map_html
+    assert "applyThemeMode" in suitability_map_html
+    assert "setThemeMode" in suitability_map_html
+    assert 'localStorage.setItem(THEME_STORAGE_KEY, mode)' in suitability_map_html
+    assert 'html[data-theme="dark"]' in suitability_map_html
+    assert "displayMode = \"square\"" in suitability_map_html
+    assert "squareDisplayPath" in suitability_map_html
+    assert "updateCellDisplayGeometry" in suitability_map_html
+    assert "setDisplayMode" in suitability_map_html
+    assert "hex-state-boundary" in suitability_map_html
+    assert "buildHexStateBoundarySegments" in suitability_map_html
+    assert "assignStateCodeForFeature" in suitability_map_html
+    assert 'stateBoundaryPaths.style("display", displayMode === "hex" ? "none" : null)' in suitability_map_html
+    assert 'hexStateBoundaryPaths.style("display", displayMode === "hex" ? null : "none")' in suitability_map_html
     assert "projectedHexPath" in suitability_map_html
+    assert "buildHexTileMetrics" in suitability_map_html
+    assert "hexTileMetrics" in suitability_map_html
+    assert "metrics.xPitch = 1.5 * metrics.radius" in suitability_map_html
+    assert "honeycombCenterFromCentroid" in suitability_map_html
+    assert "hexDisplayCentersByKey" in suitability_map_html
+    assert "+ (Math.abs(column) % 2) * (metrics.yPitch / 2)" in suitability_map_html
     assert "hexDisplayPath" in suitability_map_html
+    assert "const hexDisplayPath = (feature) => projectedHexPath(feature, hexTileMetrics);" in suitability_map_html
+    assert "Math.min(cellWidth / 2, cellHeight / Math.sqrt(3)) * scale" not in suitability_map_html
+    assert "displayMode === \"hex\" ? hexDisplayPath(feature) : squareDisplayPath(feature)" in suitability_map_html
     assert "suitability-hex" in suitability_map_html
     assert "is-active" in suitability_map_html
-    assert "row.cell_name" in suitability_map_html
+    assert "displayCellName(row)" in suitability_map_html
+    assert "normalizeDisplayName" in suitability_map_html
+    assert "general_american_cell_name" in suitability_map_html
+    assert "local_cell_name" in suitability_map_html
+    assert "Identity stack:" in suitability_map_html
+    assert "Label source:" in suitability_map_html
+    assert "formatCellNameBasis" in suitability_map_html
+    assert "Naming basis:" not in suitability_map_html
+    assert "row.cell_name_basis}} name" not in suitability_map_html
     assert "state-boundary" in suitability_map_html
     assert "hosting-layer-toggle" in suitability_map_html
     assert "Hosting Capacity Proxy" in suitability_map_html
+    assert "permitting-layer-toggle" in suitability_map_html
+    assert "Permitting / Ordinance Proxy" in suitability_map_html
+    assert "permitting-proxy-cell" in suitability_map_html
+    assert "social-friction-layer-toggle" in suitability_map_html
+    assert "Social-Friction Proxy" in suitability_map_html
+    assert "social-friction-proxy-cell" in suitability_map_html
     assert "zoning-layer-toggle" in suitability_map_html
     assert "Zoning Proxy" in suitability_map_html
     assert "Cell ${{cellKeyFromObject(row)}}${{row.cell_name_basis" not in suitability_map_html
     assert "if (activeCellKey === normalizedKey)" in suitability_map_html
     assert '.on("mouseenter", (event, feature) => {' in suitability_map_html
     assert '.on("mousemove", (event) => {' in suitability_map_html
-    assert '.attr("d", (feature) => hexDisplayPath(feature))' in suitability_map_html
+    assert '.attr("d", (feature) => displayPathForMode(feature))' in suitability_map_html
     assert "stroke-width: 1.8;" in suitability_map_html
     assert "drop-shadow(0 0 3px rgba(196, 92, 19, 0.45))" in suitability_map_html
     gap_names = {item["name"] for item in assumption_registry["assumption_gaps"]}
@@ -2408,6 +2767,7 @@ def test_run_public_report_bundle_writes_manifest_and_deviation_note(tmp_path, m
     assert "local_transmission_hosting_capacity" in limitation_names
     assert "demand_queue_times" in limitation_names
     assert "zoning_information" in limitation_names
+    assert "permitting_and_ordinance_information" in limitation_names
     assert "social_acceptance" in limitation_names
     hosting_limit = next(
         item
@@ -2421,6 +2781,18 @@ def test_run_public_report_bundle_writes_manifest_and_deviation_note(tmp_path, m
         if item["name"] == "zoning_information"
     )
     assert zoning_limit["status"] == "bounded proxy"
+    permitting_limit = next(
+        item
+        for item in assumption_registry["limitation_carry_forward"]
+        if item["name"] == "permitting_and_ordinance_information"
+    )
+    assert permitting_limit["status"] == "bounded proxy"
+    social_limit = next(
+        item
+        for item in assumption_registry["limitation_carry_forward"]
+        if item["name"] == "social_acceptance"
+    )
+    assert social_limit["status"] == "bounded proxy"
 
     reeds_contract = json.loads(reeds_contract_path.read_text())
     assert reeds_contract["contract_type"] == "bounded-public-report-reeds-integration-contract"
@@ -2460,6 +2832,40 @@ def test_run_public_report_bundle_writes_manifest_and_deviation_note(tmp_path, m
         "developed_neighborhood_context",
         "urban_core_context",
     ]
+
+    permitting_proxy = gpd.read_file(permitting_proxy_path).sort_values("sc_point_gid").reset_index(drop=True)
+    assert list(permitting_proxy["sc_point_gid"]) == [2, 3, 4]
+    assert {
+        "evidence_count",
+        "restrictive_evidence_count",
+        "friction_evidence_count",
+        "permitting_proxy_class",
+        "permitting_proxy_note",
+        "source_evidence_ids",
+    }.issubset(permitting_proxy.columns)
+    assert permitting_proxy["evidence_count"].tolist() == [1, 1, 0]
+    assert permitting_proxy["permitting_proxy_class"].tolist() == [
+        "restrictive_ordinance_evidence",
+        "public_friction_signal",
+        "no_public_evidence_recorded",
+    ]
+
+    social_friction_proxy = gpd.read_file(social_friction_proxy_path).sort_values("sc_point_gid").reset_index(drop=True)
+    assert list(social_friction_proxy["sc_point_gid"]) == [2, 3, 4]
+    assert {
+        "evidence_count",
+        "opposition_evidence_count",
+        "concern_evidence_count",
+        "social_friction_proxy_class",
+        "social_friction_proxy_note",
+        "source_evidence_ids",
+    }.issubset(social_friction_proxy.columns)
+    assert social_friction_proxy["evidence_count"].tolist() == [1, 1, 0]
+    assert social_friction_proxy["social_friction_proxy_class"].tolist() == [
+        "organized_opposition_evidence",
+        "public_concern_signal",
+        "no_public_evidence_recorded",
+    ]
     assert "capacity scaling" in limitations_text.lower()
     assert "social acceptance" in limitations_text.lower()
     assert "not implemented" in limitations_text.lower()
@@ -2470,14 +2876,17 @@ def test_run_public_report_bundle_writes_manifest_and_deviation_note(tmp_path, m
     assert "water_wetland_share" in feasible_land.columns
     assert "water_wetland_excluded" in feasible_land.columns
     assert feasible_land["water_wetland_excluded"].notna().all()
-    assert feasible_land["water_wetland_excluded"].fillna(False).tolist() == [False, False, False]
+    assert feasible_land["water_wetland_excluded"].fillna(False).tolist() == [True, False, False]
 
     suitability = gpd.read_file(suitability_path).sort_values("sc_point_gid")
     assert suitability["sc_point_gid"].tolist() == [2, 3, 4]
     assert suitability["suitability_score"].tolist() == [0.2, 0.8, 0.5]
-    assert suitability["suitability_percentile"].tolist() == [16.666667, 83.333333, 50.0]
+    assert suitability["suitability_percentile"].tolist() == [0.0, 83.333333, 50.0]
     assert "cell_name" in suitability.columns
     assert "base_cell_name" in suitability.columns
+    assert "local_cell_name" in suitability.columns
+    assert "general_american_cell_name" in suitability.columns
+    assert "identity_stack_json" in suitability.columns
     assert "cell_name_basis" in suitability.columns
     assert "cell_name_is_disambiguated" in suitability.columns
     assert "anchor_place_name" in suitability.columns
@@ -2492,9 +2901,12 @@ def test_run_public_report_bundle_writes_manifest_and_deviation_note(tmp_path, m
     ranked_suitability = pd.read_csv(ranked_suitability_path)
     assert ranked_suitability["national_rank"].tolist() == [1, 2, 3]
     assert ranked_suitability["sc_point_gid"].tolist() == [3, 4, 2]
-    assert ranked_suitability["suitability_percentile"].tolist() == [83.333333, 50.0, 16.666667]
+    assert ranked_suitability["suitability_percentile"].tolist() == [83.333333, 50.0, 0.0]
     assert "cell_name" in ranked_suitability.columns
     assert "base_cell_name" in ranked_suitability.columns
+    assert "local_cell_name" in ranked_suitability.columns
+    assert "general_american_cell_name" in ranked_suitability.columns
+    assert "identity_stack_json" in ranked_suitability.columns
     assert "cell_name_basis" in ranked_suitability.columns
     assert "cell_name_is_disambiguated" in ranked_suitability.columns
     assert "anchor_place_name" in ranked_suitability.columns

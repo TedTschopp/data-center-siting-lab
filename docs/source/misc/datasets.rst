@@ -69,6 +69,9 @@ artifacts:
 * ``external-data/derived/water``: generated first-pass public water proxy artifacts.
 * ``external-data/derived/nerc``: generated NERC assessment-area, EMM-zone, and grid
   reserve-margin artifacts.
+* ``external-data/derived/report-bundle``: local regenerated report-bundle outputs;
+  only the README policy is tracked, while the generated HTML, GeoPackage, JSON, CSV,
+  Markdown, and cache payloads are recreated from the bundle command.
 
 The ``external-data/raw``, ``external-data/unpacked``, and ``external-data/examples``
 directories are intentionally ignored by git so that local downloads and runnable
@@ -191,6 +194,11 @@ This command materializes a bundle directory with:
 * ``external-data/derived/report-bundle/public_report_feasible_land.gpkg``
 * ``external-data/derived/report-bundle/public_report_suitability_percentiles.gpkg``
 * ``external-data/derived/report-bundle/public_report_suitability_ranked_cells.csv``
+* ``external-data/derived/report-bundle/public_report_state_boundaries.gpkg``
+* ``external-data/derived/report-bundle/public_report_zoning_proxy.gpkg``
+* ``external-data/derived/report-bundle/public_report_permitting_proxy.gpkg``
+* ``external-data/derived/report-bundle/public_report_social_friction_proxy.gpkg``
+* ``external-data/derived/report-bundle/public_report_hosting_capacity_proxy.gpkg``
 * ``external-data/derived/report-bundle/public_report_suitability_map.html``
 * ``external-data/derived/report-bundle/public_report_assumption_registry.json``
 * ``external-data/derived/report-bundle/public_report_limitations.md``
@@ -201,11 +209,13 @@ This command materializes a bundle directory with:
 * ``external-data/derived/report-bundle/public_report_bundle_manifest.json``
 * ``external-data/derived/report-bundle/public_report_bundle_deviations.md``
 
-Use this command when you want one tracked report-output surface for the current
-bounded public approximation. The manifest records the generated output paths plus
-the current baseline-year and grid-priority assumptions. The deviation note makes
-the remaining report-parity gaps explicit, including the use of the fixture grid,
-the 2022 baseline year, and the pre-existing ``suitability_score`` field.
+Use this command when you want one local report-output surface for the current
+bounded public approximation. The generated bundle outputs are intentionally ignored
+by git; track the command, source code, tests, manifests, provenance, and
+documentation that recreate them. The manifest records the generated output paths
+plus the current baseline-year and grid-priority assumptions. The deviation note
+makes the remaining report-parity gaps explicit, including the use of the fixture
+grid, the 2022 baseline year, and the pre-existing ``suitability_score`` field.
 
 The cumulative buildout GeoPackages are derived directly from the existing total
 and grouped regional smoke outputs. They add baseline, cumulative-new, and
@@ -214,19 +224,31 @@ those values by source output and year.
 
 The feasible-land and suitability-percentile GeoPackages are derived directly from
 the current execution grid. The bounded feasible-land layer keeps cells where
-``developable_capacity_mw > 0``, and the bounded suitability layer ranks the
-pre-existing ``suitability_score`` field across those feasible cells.
+``developable_capacity_mw > 0``. Cells whose staged NLCD water/wetland share is at
+least ``0.5`` remain in the layer as flagged records, and the bounded suitability
+layer clamps those cells to ``0`` suitability percentile after ranking the
+pre-existing ``suitability_score`` field across developable cells.
 
 The ranked suitability CSV is derived from that same bounded suitability layer. It
-assigns a nationwide rank and sorts feasible cells by suitability percentile,
-suitability score, and developable capacity.
+assigns a nationwide rank and sorts developable cells by suitability percentile,
+suitability score, and developable capacity, with water/wetland-flagged cells
+retained at the bottom of the percentile surface. Cell labels follow a deterministic
+bounded geographic identity stack. The outputs preserve a stable unique
+``cell_name`` for row joins and disambiguation, plus ``local_cell_name``,
+``general_american_cell_name``, and ``identity_stack_json`` fields so the map can
+choose the useful layer for its audience. General-audience labels use nearby
+metro/city names when they are meaningful and move up to state-region or state
+labels when the nearest metro is too distant. Naming basis fields remain in the
+data outputs and map tooltip rather than being appended to the visible table label.
 
 The D3 suitability map HTML page uses a single self-contained browser document to
 render the bounded feasible-land and suitability surfaces directly from embedded
 bundle data. The underlying grid remains the internal model, but the browser display
 draws grid-backed cells as fitted hexagons for quicker visual scanning. Use it when
 you want a quick visual review without opening the GeoPackages in desktop GIS
-software.
+software. Optional state-boundary, zoning-proxy, permitting / ordinance evidence,
+social-friction evidence, and hosting-capacity proxy layers provide bounded context
+overlays without replacing the base suitability surface.
 
 The assumption registry JSON is derived from the tracked total and regional smoke
 configs plus the bounded bundle rules. It records scenario inputs,
@@ -237,7 +259,10 @@ The limitations note carries forward the named LinkedIn refinement gaps directly
 into the generated bundle. It explicitly states that local transmission hosting
 capacity, demand queue times, zoning, permitting and ordinance information,
 capacity scaling by market trends, and social acceptance are not fully
-implemented in the current bounded report surface.
+implemented in the current bounded report surface. Zoning, permitting, social
+friction, and hosting now have bounded proxy layers, but those layers do not imply
+parcel entitlement, permit readiness, ordinance compatibility, social acceptance, or
+local interconnection feasibility.
 
 The ReEDS integration contract JSON defines the bounded handoff surface for
 ReEDS-facing workflows. It records the current handoff products, required
