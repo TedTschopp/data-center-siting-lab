@@ -233,13 +233,16 @@ The ranked suitability CSV is derived from that same bounded suitability layer. 
 assigns a nationwide rank and sorts developable cells by suitability percentile,
 suitability score, and developable capacity, with water/wetland-flagged cells
 retained at the bottom of the percentile surface. Cell labels follow a deterministic
-bounded geographic identity stack. The outputs preserve a stable unique
-``cell_name`` for row joins and disambiguation, plus ``local_cell_name``,
-``general_american_cell_name``, and ``identity_stack_json`` fields so the map can
-choose the useful layer for its audience. General-audience labels use nearby
-metro/city names when they are meaningful and move up to state-region or state
-labels when the nearest metro is too distant. Naming basis fields remain in the
-data outputs and map tooltip rather than being appended to the visible table label.
+bounded geographic identity stack. By default the report bundle enriches each cell
+with the U.S. Census coordinate GeoLookup API and caches those generated responses
+in the output directory; ``--no-census-geolookup`` keeps the fully offline bounded
+catalog fallback. The outputs preserve a stable unique ``cell_name`` for row joins
+and disambiguation, plus ``local_cell_name``, ``general_american_cell_name``,
+``identity_stack_json``, and normalized ``census_*`` geography fields so the map
+can choose the useful layer for its audience. Census-backed labels use official
+place, county subdivision, county, metro area, state, Census division, and Census
+region names when available. Naming basis fields remain in the data outputs and
+map tooltip rather than being appended to the visible table label.
 
 The D3 suitability map HTML page uses a single self-contained browser document to
 render the bounded feasible-land and suitability surfaces directly from embedded

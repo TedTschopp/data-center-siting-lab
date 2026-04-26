@@ -47,6 +47,25 @@ PUBLIC_REPORT_REFERENCE_INITIAL_LOCATIONS = "Baxtel 2025 operating data centers"
 PUBLIC_REPORT_STATE_BOUNDARY_SOURCE_URL = (
     "https://www2.census.gov/geo/tiger/GENZ2024/shp/cb_2024_us_state_20m.zip"
 )
+PUBLIC_REPORT_CENSUS_GEOLOOKUP_URL = (
+    "https://geocoding.geo.census.gov/geocoder/geographies/coordinates"
+)
+PUBLIC_REPORT_CENSUS_GEOLOOKUP_BENCHMARK = "Public_AR_Current"
+PUBLIC_REPORT_CENSUS_GEOLOOKUP_VINTAGE = "Current_Current"
+PUBLIC_REPORT_CENSUS_GEOLOOKUP_LAYERS = (
+    "States",
+    "Counties",
+    "County Subdivisions",
+    "Census Designated Places",
+    "Incorporated Places",
+    "Metropolitan Statistical Areas",
+    "Combined Statistical Areas",
+    "Urban Areas",
+    "Census Regions",
+    "Census Divisions",
+    "Census Tracts",
+    "2020 Census Blocks",
+)
 PUBLIC_NLCD_REPRESENTATIVE_BASENAME = "Annual_NLCD_LndCov_2023_CU_C1V0"
 PUBLIC_NLCD_REPRESENTATIVE_ZIP_NAME = f"{PUBLIC_NLCD_REPRESENTATIVE_BASENAME}.zip"
 PUBLIC_NLCD_REPRESENTATIVE_TIF_NAME = f"{PUBLIC_NLCD_REPRESENTATIVE_BASENAME}.tif"
@@ -3993,7 +4012,9 @@ def _write_public_report_bundle_readme(output_dir):
                 "",
                 "Regenerate the local bundle whenever you need the HTML map, GeoPackages, manifest,",
                 "status JSON, deviation note, ranked CSV, cumulative buildout surfaces, or cached",
-                "state-boundary source ZIP.",
+                "state-boundary source ZIP. The default run also writes a generated",
+                "`public_report_census_geography_cache.json` file for Census coordinate GeoLookup",
+                "identity enrichment; pass `--no-census-geolookup` to skip that online enrichment.",
                 "",
             ]
         )
@@ -4163,6 +4184,224 @@ def _clean_public_report_text(value):
     return text or None
 
 
+def _first_public_report_census_layer(geographies, layer_names):
+    """Return the first Census geography row from the requested layer aliases."""
+    for layer_name in layer_names:
+        rows = geographies.get(layer_name)
+        if rows:
+            return layer_name, rows[0]
+    return None, None
+
+
+def _clean_public_report_census_name(row, field="NAME"):
+    """Return a clean Census geography name from one response row."""
+    if not row:
+        return None
+    return _clean_public_report_text(row.get(field)) or _clean_public_report_text(row.get("NAME"))
+
+
+def _extract_public_report_census_geography_record(payload):
+    """Normalize one Census coordinate GeoLookup JSON response into report identity fields."""
+    geographies = payload.get("result", {}).get("geographies", {}) if payload else {}
+    if not geographies:
+        return {
+            "census_geolookup_status": "missing",
+            "census_place_name": None,
+            "census_place_layer": None,
+            "census_district_name": None,
+            "census_county_name": None,
+            "census_state_name": None,
+            "census_state_code": None,
+            "census_metro_area_name": None,
+            "census_combined_statistical_area_name": None,
+            "census_urban_area_name": None,
+            "census_state_region_name": None,
+            "census_national_region_name": None,
+            "census_tract_geoid": None,
+            "census_block_geoid": None,
+        }
+
+    place_layer, place_row = _first_public_report_census_layer(
+        geographies,
+        ("Incorporated Places", "Census Designated Places"),
+    )
+    _, county_subdivision_row = _first_public_report_census_layer(
+        geographies,
+        ("County Subdivisions",),
+    )
+    _, county_row = _first_public_report_census_layer(geographies, ("Counties",))
+    _, state_row = _first_public_report_census_layer(geographies, ("States",))
+    _, metro_row = _first_public_report_census_layer(
+        geographies,
+        ("Metropolitan Statistical Areas",),
+    )
+    _, combined_statistical_area_row = _first_public_report_census_layer(
+        geographies,
+        ("Combined Statistical Areas",),
+    )
+    _, urban_area_row = _first_public_report_census_layer(geographies, ("Urban Areas",))
+    _, division_row = _first_public_report_census_layer(geographies, ("Census Divisions",))
+    _, region_row = _first_public_report_census_layer(geographies, ("Census Regions",))
+    _, tract_row = _first_public_report_census_layer(geographies, ("Census Tracts",))
+    _, block_row = _first_public_report_census_layer(
+        geographies,
+        ("2020 Census Blocks", "Census Blocks"),
+    )
+
+    return {
+        "census_geolookup_status": "matched",
+        "census_place_name": _clean_public_report_census_name(place_row, "BASENAME"),
+        "census_place_layer": place_layer,
+        "census_district_name": _clean_public_report_census_name(county_subdivision_row),
+        "census_county_name": _clean_public_report_census_name(county_row),
+        "census_state_name": _clean_public_report_census_name(state_row),
+        "census_state_code": _clean_public_report_census_name(state_row, "STUSAB"),
+        "census_metro_area_name": _clean_public_report_census_name(metro_row),
+        "census_combined_statistical_area_name": _clean_public_report_census_name(
+            combined_statistical_area_row
+        ),
+        "census_urban_area_name": _clean_public_report_census_name(urban_area_row),
+        "census_state_region_name": _clean_public_report_census_name(division_row),
+        "census_national_region_name": _clean_public_report_census_name(region_row),
+        "census_tract_geoid": _clean_public_report_census_name(tract_row, "GEOID"),
+        "census_block_geoid": _clean_public_report_census_name(block_row, "GEOID"),
+    }
+
+
+def _build_public_report_census_geolookup_url(latitude, longitude):
+    """Build a Census coordinate GeoLookup URL for one WGS84 point."""
+    params = urlencode(
+        {
+            "x": f"{float(longitude):.8f}",
+            "y": f"{float(latitude):.8f}",
+            "benchmark": PUBLIC_REPORT_CENSUS_GEOLOOKUP_BENCHMARK,
+            "vintage": PUBLIC_REPORT_CENSUS_GEOLOOKUP_VINTAGE,
+            "layers": ",".join(PUBLIC_REPORT_CENSUS_GEOLOOKUP_LAYERS),
+            "format": "json",
+        }
+    )
+    return f"{PUBLIC_REPORT_CENSUS_GEOLOOKUP_URL}?{params}"
+
+
+def _fetch_public_report_census_geography(latitude, longitude, timeout=30):
+    """Fetch one normalized Census coordinate GeoLookup record."""
+    request_url = _build_public_report_census_geolookup_url(latitude, longitude)
+    with urllib.request.urlopen(request_url, timeout=timeout) as response:
+        payload = json.loads(response.read().decode("utf-8"))
+    return _extract_public_report_census_geography_record(payload)
+
+
+def _public_report_census_cache_key(latitude, longitude):
+    """Return a stable coordinate cache key for Census identity enrichment."""
+    return f"{float(longitude):.6f},{float(latitude):.6f}"
+
+
+def _coerce_public_report_coordinate_value(value):
+    """Return a numeric coordinate value or None when it is unavailable."""
+    try:
+        coordinate = float(value)
+    except (TypeError, ValueError):
+        return None
+    if pd.isna(coordinate):
+        return None
+    return coordinate
+
+
+def _load_public_report_census_geography_cache(cache_path):
+    """Load cached Census GeoLookup responses from a generated output directory."""
+    cache_path = Path(cache_path)
+    if not cache_path.exists():
+        return {}
+    try:
+        payload = json.loads(cache_path.read_text())
+    except (json.JSONDecodeError, OSError):
+        return {}
+    return payload if isinstance(payload, dict) else {}
+
+
+def _write_public_report_census_geography_cache(cache_path, cache):
+    """Persist generated Census GeoLookup cache records."""
+    cache_path = Path(cache_path)
+    cache_path.parent.mkdir(parents=True, exist_ok=True)
+    cache_path.write_text(json.dumps(cache, indent=2, sort_keys=True))
+
+
+def _fetch_public_report_census_geographies(frame, cache_path=None, timeout=30):
+    """Fetch Census coordinate GeoLookup identity records for report cells with caching."""
+    if (
+        "latitude" not in frame.columns
+        and "longitude" not in frame.columns
+        and "geometry" not in frame.columns
+    ):
+        return None
+
+    lookup_points = None
+    if "geometry" in frame.columns:
+        lookup_frame = frame
+        if isinstance(frame, gpd.GeoDataFrame) and frame.crs is not None and str(frame.crs) != "EPSG:4326":
+            lookup_frame = frame.to_crs("EPSG:4326")
+        lookup_points = lookup_frame.geometry.representative_point()
+
+    cache = _load_public_report_census_geography_cache(cache_path) if cache_path else {}
+    records = []
+    cache_changed = False
+    for index, row in frame.iterrows():
+        latitude = _coerce_public_report_coordinate_value(row.get("latitude"))
+        longitude = _coerce_public_report_coordinate_value(row.get("longitude"))
+        invalid_coordinate = (
+            latitude is None
+            or longitude is None
+            or not -90.0 <= latitude <= 90.0
+            or not -180.0 <= longitude <= 180.0
+        )
+        if invalid_coordinate and lookup_points is not None:
+            latitude = float(lookup_points.loc[index].y)
+            longitude = float(lookup_points.loc[index].x)
+            invalid_coordinate = False
+
+        if invalid_coordinate:
+            records.append(_extract_public_report_census_geography_record(None))
+            continue
+
+        cache_key = _public_report_census_cache_key(latitude, longitude)
+        if cache_key not in cache:
+            try:
+                cache[cache_key] = _fetch_public_report_census_geography(
+                    latitude,
+                    longitude,
+                    timeout=timeout,
+                )
+            except (json.JSONDecodeError, KeyError, OSError, TimeoutError, urllib.error.URLError) as error:
+                cache[cache_key] = {
+                    **_extract_public_report_census_geography_record(None),
+                    "census_geolookup_status": "error",
+                    "census_geolookup_error": str(error),
+                }
+            cache_changed = True
+        records.append(cache[cache_key])
+
+    if cache_path and cache_changed:
+        _write_public_report_census_geography_cache(cache_path, cache)
+    return pd.DataFrame(records, index=frame.index)
+
+
+def _coerce_public_report_census_geography_frame(census_geographies, index):
+    """Align caller-provided Census geography records to the report-cell index."""
+    if census_geographies is None:
+        return None
+    if isinstance(census_geographies, pd.DataFrame):
+        census_frame = census_geographies.copy()
+    else:
+        census_frame = pd.DataFrame(census_geographies)
+    if census_frame.empty:
+        return None
+    if list(census_frame.index) != list(index):
+        if len(census_frame) != len(index):
+            raise ValueError("Census geography records must align one-to-one with report cells")
+        census_frame.index = index
+    return census_frame
+
+
 def _format_public_report_coordinate_label(latitude, longitude):
     """Format a coordinate fallback for public report cell identity fields."""
     return f"{float(latitude):.3f}, {float(longitude):.3f}"
@@ -4286,15 +4525,18 @@ def _format_public_report_cell_name_from_anchor(row, distance_precision=1, inclu
         pd.notna(anchor_place_name)
         and pd.notna(anchor_place_county)
         and pd.notna(anchor_place_state)
-        and pd.notna(anchor_place_distance_miles)
-        and pd.notna(anchor_place_direction)
     ):
-        label = (
-            f"{float(anchor_place_distance_miles):.{distance_precision}f} miles "
-            f"{anchor_place_direction} of {anchor_place_name}, {anchor_place_county}, {anchor_place_state}"
-        )
-        if pd.notna(base_cell_name) and str(base_cell_name) != str(anchor_place_name):
-            label = f"{label} near {base_cell_name}"
+        if pd.notna(anchor_place_distance_miles) and pd.notna(anchor_place_direction):
+            label = (
+                f"{float(anchor_place_distance_miles):.{distance_precision}f} miles "
+                f"{anchor_place_direction} of {anchor_place_name}, {anchor_place_county}, {anchor_place_state}"
+            )
+            if pd.notna(base_cell_name) and str(base_cell_name) != str(anchor_place_name):
+                label = f"{label} near {base_cell_name}"
+        else:
+            label = str(anchor_place_name)
+            if pd.notna(base_cell_name) and str(base_cell_name) != str(anchor_place_name):
+                label = f"{base_cell_name} in {anchor_place_name}"
         if include_coordinates:
             label = f"{label} at {float(row['latitude']):.3f}, {float(row['longitude']):.3f}"
         return label
@@ -4398,15 +4640,44 @@ def _build_public_report_identity_fields(
     metro_candidate,
     natural_candidate,
     anchor_place,
+    census_geography=None,
 ):
     """Build local and general-audience identity layers from bounded offline inputs."""
     exact_point = _format_public_report_coordinate_label(center_latitude, center_longitude)
+    census_geography = census_geography or {}
+    has_census_match = census_geography.get("census_geolookup_status") == "matched"
+    census_place_name = _clean_public_report_text(census_geography.get("census_place_name"))
+    census_district_name = _clean_public_report_text(census_geography.get("census_district_name"))
+    census_county_name = _clean_public_report_text(census_geography.get("census_county_name"))
+    census_state_name = _clean_public_report_text(census_geography.get("census_state_name"))
+    census_state_code = _clean_public_report_text(census_geography.get("census_state_code"))
+    census_metro_area_name = _clean_public_report_text(
+        census_geography.get("census_metro_area_name")
+    )
+    census_combined_statistical_area_name = _clean_public_report_text(
+        census_geography.get("census_combined_statistical_area_name")
+    )
+    census_urban_area_name = _clean_public_report_text(census_geography.get("census_urban_area_name"))
+    census_state_region_name = _clean_public_report_text(
+        census_geography.get("census_state_region_name")
+    )
+    census_national_region_name = _clean_public_report_text(
+        census_geography.get("census_national_region_name")
+    )
+
     anchor_name = _clean_public_report_text(anchor_place.get("anchor_place_name"))
     anchor_county = _clean_public_report_text(anchor_place.get("anchor_place_county"))
     anchor_state = _clean_public_report_text(anchor_place.get("anchor_place_state"))
-    state_name = _format_public_report_state_name(anchor_state)
-    state_region = _select_public_report_state_region(center_latitude, center_longitude, anchor_state)
-    national_region = _select_public_report_national_region(anchor_state)
+    state_name = census_state_name or _format_public_report_state_name(anchor_state)
+    state_code = census_state_code or anchor_state
+    state_region = census_state_region_name or _select_public_report_state_region(
+        center_latitude,
+        center_longitude,
+        state_code,
+    )
+    national_region = census_national_region_name or _select_public_report_national_region(
+        state_code
+    )
 
     metro_name = _clean_public_report_text(metro_candidate.get("feature_name"))
     metro_distance_miles = metro_candidate.get("distance_miles")
@@ -4422,21 +4693,39 @@ def _build_public_report_identity_fields(
     ):
         landmark_name = natural_name
 
-    if anchor_name is not None:
+    census_metro_name = (
+        census_metro_area_name or census_combined_statistical_area_name or census_urban_area_name
+    )
+
+    anchor_city_name = None if has_census_match else anchor_name
+
+    if census_place_name is not None:
+        local_name = census_place_name
+        local_layer = "city"
+    elif census_district_name is not None:
+        local_name = census_district_name
+        local_layer = "district"
+    elif anchor_city_name is not None:
         local_name = anchor_name
         local_layer = "city"
     elif landmark_name is not None:
         local_name = f"near {landmark_name}"
         local_layer = "landmark_or_address"
-    elif anchor_county is not None:
-        local_name = anchor_county
+    elif census_county_name is not None or anchor_county is not None:
+        local_name = census_county_name or anchor_county
         local_layer = "county"
     else:
         local_name = exact_point
         local_layer = "exact_point"
 
     state_suffix = f", {state_name}" if state_name is not None else ""
-    if metro_name is not None and (
+    if census_place_name is not None:
+        general_name = f"{census_place_name}{state_suffix}"
+        general_layer = "city"
+    elif census_metro_name is not None:
+        general_name = census_metro_name
+        general_layer = "metro_area"
+    elif metro_name is not None and (
         metro_candidate.get("match_scope") == "in_cell"
         or (
             metro_distance_miles is not None
@@ -4466,10 +4755,10 @@ def _build_public_report_identity_fields(
         {"layer": "exact_point", "name": exact_point},
         {"layer": "landmark_or_address", "name": landmark_name},
         {"layer": "neighborhood", "name": None},
-        {"layer": "district", "name": None},
-        {"layer": "city", "name": anchor_name},
-        {"layer": "county", "name": anchor_county},
-        {"layer": "metro_area", "name": metro_name},
+        {"layer": "district", "name": census_district_name},
+        {"layer": "city", "name": census_place_name or anchor_city_name},
+        {"layer": "county", "name": census_county_name or anchor_county},
+        {"layer": "metro_area", "name": census_metro_name or metro_name},
         {"layer": "state_region", "name": state_region},
         {"layer": "state", "name": state_name},
         {"layer": "national_region", "name": national_region},
@@ -4482,6 +4771,49 @@ def _build_public_report_identity_fields(
         "general_american_cell_name": general_name,
         "general_american_cell_name_layer": general_layer,
         "identity_stack_json": json.dumps(identity_stack, ensure_ascii=True),
+    }
+
+
+def _select_public_report_census_cell_name_choice(census_geography):
+    """Return a Census-backed base label for stable cell naming when available."""
+    if not census_geography or census_geography.get("census_geolookup_status") != "matched":
+        return None
+    for column in (
+        "census_place_name",
+        "census_district_name",
+        "census_county_name",
+        "census_state_name",
+    ):
+        value = _clean_public_report_text(census_geography.get(column))
+        if value is not None:
+            return {
+                "cell_name": value,
+                "cell_name_basis": "census_geolookup",
+                "cell_name_popularity_score": None,
+                "cell_name_match_scope": "intersecting_census_geography",
+            }
+    return None
+
+
+def _select_public_report_census_anchor_place(census_geography):
+    """Build anchor metadata from Census intersecting geography when available."""
+    if not census_geography or census_geography.get("census_geolookup_status") != "matched":
+        return None
+    anchor_place_name = (
+        _clean_public_report_text(census_geography.get("census_place_name"))
+        or _clean_public_report_text(census_geography.get("census_district_name"))
+        or _clean_public_report_text(census_geography.get("census_county_name"))
+    )
+    anchor_place_county = _clean_public_report_text(census_geography.get("census_county_name"))
+    anchor_place_state = _clean_public_report_text(census_geography.get("census_state_code"))
+    if anchor_place_name is None or anchor_place_county is None or anchor_place_state is None:
+        return None
+    return {
+        "anchor_place_name": anchor_place_name,
+        "anchor_place_county": anchor_place_county,
+        "anchor_place_state": anchor_place_state,
+        "anchor_place_distance_miles": None,
+        "anchor_place_direction": None,
     }
 
 
@@ -4541,12 +4873,21 @@ def _make_public_report_cell_names_unique(frame):
     return named
 
 
-def _annotate_public_report_cell_names(frame, place_catalog=None, place_anchor_catalog=None):
+def _annotate_public_report_cell_names(
+    frame,
+    place_catalog=None,
+    place_anchor_catalog=None,
+    census_geographies=None,
+):
     """Add deterministic human-readable place names to bounded report suitability cells."""
     named = frame.copy()
     catalog_df = _build_public_report_place_catalog_frame(place_catalog=place_catalog)
     anchor_catalog_df = _build_public_report_place_anchor_catalog_frame(
         place_anchor_catalog=place_anchor_catalog
+    )
+    census_geography_frame = _coerce_public_report_census_geography_frame(
+        census_geographies,
+        named.index,
     )
 
     if "geometry" not in named.columns:
@@ -4599,8 +4940,17 @@ def _annotate_public_report_cell_names(frame, place_catalog=None, place_anchor_c
             catalog_df,
             "natural",
         )
-        chosen = _select_public_report_cell_name_choice(metro_candidate, natural_candidate)
-        anchor_place = _select_public_report_anchor_place(
+        census_geography = (
+            census_geography_frame.loc[index].to_dict()
+            if census_geography_frame is not None and index in census_geography_frame.index
+            else None
+        )
+        chosen = _select_public_report_census_cell_name_choice(
+            census_geography
+        ) or _select_public_report_cell_name_choice(metro_candidate, natural_candidate)
+        anchor_place = _select_public_report_census_anchor_place(
+            census_geography
+        ) or _select_public_report_anchor_place(
             center_latitude,
             center_longitude,
             anchor_catalog_df,
@@ -4612,7 +4962,9 @@ def _annotate_public_report_cell_names(frame, place_catalog=None, place_anchor_c
             metro_candidate,
             natural_candidate,
             anchor_place,
+            census_geography=census_geography,
         )
+        census_fields = census_geography or {}
         annotation_rows.append(
             {
                 "metro_feature_name": metro_candidate["feature_name"],
@@ -4625,6 +4977,7 @@ def _annotate_public_report_cell_names(frame, place_catalog=None, place_anchor_c
                 "natural_feature_distance_degrees": natural_candidate["distance_degrees"],
                 "natural_feature_distance_miles": natural_candidate["distance_miles"],
                 "natural_feature_match_scope": natural_candidate["match_scope"],
+                **census_fields,
                 **anchor_place,
                 **identity_fields,
                 **chosen,
@@ -4664,6 +5017,20 @@ def _build_public_report_ranked_suitability_summary(frame):
         "general_american_cell_name",
         "general_american_cell_name_layer",
         "identity_stack_json",
+        "census_geolookup_status",
+        "census_place_name",
+        "census_place_layer",
+        "census_district_name",
+        "census_county_name",
+        "census_state_name",
+        "census_state_code",
+        "census_metro_area_name",
+        "census_combined_statistical_area_name",
+        "census_urban_area_name",
+        "census_state_region_name",
+        "census_national_region_name",
+        "census_tract_geoid",
+        "census_block_geoid",
         "cell_name_basis",
         "cell_name_is_disambiguated",
         "anchor_place_name",
@@ -7322,7 +7689,7 @@ def _write_public_report_bundle_cumulative_buildout(
     return {"outputs": cumulative_output_paths}
 
 
-def _write_public_report_bundle_grid_surfaces(repo_root, output_dir):
+def _write_public_report_bundle_grid_surfaces(repo_root, output_dir, use_census_geolookup=True):
     """Write bounded feasible-land and suitability-percentile surfaces from the execution grid."""
     output_dir = Path(output_dir)
     output_dir.mkdir(parents=True, exist_ok=True)
@@ -7332,8 +7699,16 @@ def _write_public_report_bundle_grid_surfaces(repo_root, output_dir):
     feasible_land_path = output_dir / "public_report_feasible_land.gpkg"
     feasible_land.to_file(feasible_land_path, driver="GPKG")
 
+    suitability_base = _build_public_report_suitability_percentile_frame(feasible_land)
+    census_geographies = None
+    if use_census_geolookup:
+        census_geographies = _fetch_public_report_census_geographies(
+            suitability_base,
+            cache_path=output_dir / "public_report_census_geography_cache.json",
+        )
     suitability = _annotate_public_report_cell_names(
-        _build_public_report_suitability_percentile_frame(feasible_land)
+        suitability_base,
+        census_geographies=census_geographies,
     )
     suitability_path = output_dir / "public_report_suitability_percentiles.gpkg"
     suitability.to_file(suitability_path, driver="GPKG")
@@ -7401,6 +7776,7 @@ def run_public_report_bundle(
     reproduction_status_path=None,
     resume=False,
     force=False,
+    use_census_geolookup=True,
 ):
     """Materialize the bounded public report-output bundle and its explicit deviations."""
     repo_root = Path(repo_root).resolve()
@@ -7435,6 +7811,7 @@ def run_public_report_bundle(
             "runner": lambda: _write_public_report_bundle_grid_surfaces(
                 repo_root,
                 output_dir,
+                use_census_geolookup=use_census_geolookup,
             ),
         },
         {
@@ -8161,6 +8538,13 @@ def _build_parser():
     report_bundle_parser.add_argument("--reproduction-status-path")
     report_bundle_parser.add_argument("--resume", action="store_true")
     report_bundle_parser.add_argument("--force", action="store_true")
+    report_bundle_parser.add_argument(
+        "--no-census-geolookup",
+        dest="use_census_geolookup",
+        action="store_false",
+        help="Skip live Census coordinate GeoLookup identity enrichment",
+    )
+    report_bundle_parser.set_defaults(use_census_geolookup=True)
 
     example_workflow_parser = subparsers.add_parser(
         "run-public-example-workflows",
@@ -8420,6 +8804,7 @@ def main(args=None):
             reproduction_status_path=parsed.reproduction_status_path,
             resume=parsed.resume,
             force=parsed.force,
+            use_census_geolookup=parsed.use_census_geolookup,
         )
         print(output_dir)
         return 0

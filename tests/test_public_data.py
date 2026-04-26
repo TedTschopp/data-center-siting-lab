@@ -21,6 +21,8 @@ from reVeal.public_data import (
     MMBTU_PER_YEAR_TO_AVERAGE_MW,
     PUBLIC_DATASET_CATALOG,
     _annotate_public_report_cell_names,
+    _extract_public_report_census_geography_record,
+    _fetch_public_report_census_geographies,
     _build_public_report_feasible_land_frame,
     _build_public_report_suitability_percentile_frame,
     assess_public_eer_drop_in_compatibility,
@@ -2325,6 +2327,159 @@ def test_annotate_public_report_cell_names_disambiguates_duplicate_names():
     assert all("Coconino County, AZ" in value for value in named["cell_name"])
 
 
+def test_extract_public_report_census_geography_record_maps_named_layers():
+    """Census GeoLookup payloads should map to the identity-stack layer model."""
+
+    record = _extract_public_report_census_geography_record(
+        {
+            "result": {
+                "geographies": {
+                    "States": [
+                        {"NAME": "New Jersey", "BASENAME": "New Jersey", "STUSAB": "NJ"}
+                    ],
+                    "Counties": [{"NAME": "Union County", "BASENAME": "Union"}],
+                    "County Subdivisions": [
+                        {"NAME": "Scotch Plains township", "BASENAME": "Scotch Plains"}
+                    ],
+                    "Metropolitan Statistical Areas": [
+                        {
+                            "NAME": "New York-Newark-Jersey City, NY-NJ Metro Area",
+                            "BASENAME": "New York-Newark-Jersey City, NY-NJ",
+                        }
+                    ],
+                    "Combined Statistical Areas": [
+                        {
+                            "NAME": "New York-Newark, NY-NJ-CT-PA CSA",
+                            "BASENAME": "New York-Newark, NY-NJ-CT-PA",
+                        }
+                    ],
+                    "Urban Areas": [
+                        {
+                            "NAME": "New York--Jersey City--Newark, NY--NJ Urban Area",
+                            "BASENAME": "New York--Jersey City--Newark, NY--NJ",
+                        }
+                    ],
+                    "Census Divisions": [
+                        {"NAME": "Middle Atlantic Division", "BASENAME": "Middle Atlantic"}
+                    ],
+                    "Census Regions": [{"NAME": "Northeast Region", "BASENAME": "Northeast"}],
+                    "Census Tracts": [{"GEOID": "34039038602"}],
+                    "2020 Census Blocks": [{"GEOID": "340390386022001"}],
+                }
+            }
+        }
+    )
+
+    assert record == {
+        "census_geolookup_status": "matched",
+        "census_place_name": None,
+        "census_place_layer": None,
+        "census_district_name": "Scotch Plains township",
+        "census_county_name": "Union County",
+        "census_state_name": "New Jersey",
+        "census_state_code": "NJ",
+        "census_metro_area_name": "New York-Newark-Jersey City, NY-NJ Metro Area",
+        "census_combined_statistical_area_name": "New York-Newark, NY-NJ-CT-PA CSA",
+        "census_urban_area_name": "New York--Jersey City--Newark, NY--NJ Urban Area",
+        "census_state_region_name": "Middle Atlantic Division",
+        "census_national_region_name": "Northeast Region",
+        "census_tract_geoid": "34039038602",
+        "census_block_geoid": "340390386022001",
+    }
+
+
+def test_annotate_public_report_cell_names_uses_census_geolookup_identity():
+    """Census GeoLookup should replace misleading nearest-catalog labels when available."""
+
+    frame = gpd.GeoDataFrame(
+        {
+            "sc_point_gid": [6112],
+            "latitude": [40.603412],
+            "longitude": [-74.371100],
+        },
+        geometry=[box(-74.40, 40.58, -74.34, 40.63)],
+        crs="EPSG:4326",
+    )
+
+    named = _annotate_public_report_cell_names(
+        frame,
+        place_catalog=[
+            {
+                "name": "New York City",
+                "kind": "metro",
+                "latitude": 40.7128,
+                "longitude": -74.0060,
+                "popularity_score": 100.0,
+            }
+        ],
+        census_geographies=[
+            {
+                "census_geolookup_status": "matched",
+                "census_place_name": None,
+                "census_place_layer": None,
+                "census_district_name": "Scotch Plains township",
+                "census_county_name": "Union County",
+                "census_state_name": "New Jersey",
+                "census_state_code": "NJ",
+                "census_metro_area_name": "New York-Newark-Jersey City, NY-NJ Metro Area",
+                "census_combined_statistical_area_name": "New York-Newark, NY-NJ-CT-PA CSA",
+                "census_urban_area_name": "New York--Jersey City--Newark, NY--NJ Urban Area",
+                "census_state_region_name": "Middle Atlantic Division",
+                "census_national_region_name": "Northeast Region",
+                "census_tract_geoid": "34039038602",
+                "census_block_geoid": "340390386022001",
+            }
+        ],
+    )
+    identity_stack = json.loads(named.loc[0, "identity_stack_json"])
+    stack_by_layer = {item["layer"]: item["name"] for item in identity_stack}
+
+    assert named.loc[0, "cell_name_basis"] == "census_geolookup"
+    assert named.loc[0, "cell_name_match_scope"] == "intersecting_census_geography"
+    assert named.loc[0, "base_cell_name"] == "Scotch Plains township"
+    assert named.loc[0, "cell_name"] == "Scotch Plains township"
+    assert named.loc[0, "local_cell_name"] == "Scotch Plains township"
+    assert named.loc[0, "local_cell_name_layer"] == "district"
+    assert named.loc[0, "general_american_cell_name"] == (
+        "New York-Newark-Jersey City, NY-NJ Metro Area"
+    )
+    assert named.loc[0, "general_american_cell_name_layer"] == "metro_area"
+    assert stack_by_layer["city"] is None
+    assert stack_by_layer["district"] == "Scotch Plains township"
+    assert stack_by_layer["county"] == "Union County"
+    assert stack_by_layer["state"] == "New Jersey"
+    assert stack_by_layer["state_region"] == "Middle Atlantic Division"
+    assert stack_by_layer["national_region"] == "Northeast Region"
+
+
+def test_fetch_public_report_census_geographies_replaces_projected_coordinate_columns(monkeypatch):
+    """Census lookups should use representative lon/lat when coordinate columns are projected."""
+
+    frame = gpd.GeoDataFrame(
+        {"sc_point_gid": [303]},
+        geometry=[box(-105.2, 39.8, -104.8, 40.2)],
+        crs="EPSG:4326",
+    ).to_crs("EPSG:3857")
+    frame["latitude"] = frame.geometry.centroid.y
+    frame["longitude"] = frame.geometry.centroid.x
+    calls = []
+
+    def fake_fetch(latitude, longitude, timeout=30):
+        calls.append((latitude, longitude, timeout))
+        return {
+            "census_geolookup_status": "matched",
+            "census_place_name": "Boulder",
+            "census_place_layer": "Incorporated Places",
+        }
+
+    monkeypatch.setattr("reVeal.public_data._fetch_public_report_census_geography", fake_fetch)
+
+    records = _fetch_public_report_census_geographies(frame, timeout=17)
+
+    assert calls == [(pytest.approx(40.0, abs=0.01), pytest.approx(-105.0, abs=0.01), 17)]
+    assert records.loc[0, "census_place_name"] == "Boulder"
+
+
 def test_run_public_report_bundle_writes_manifest_and_deviation_note(tmp_path, monkeypatch, capsys):
     """The report-bundle runner should materialize a bounded output bundle plus deviations."""
 
@@ -2606,6 +2761,7 @@ def test_run_public_report_bundle_writes_manifest_and_deviation_note(tmp_path, m
         repo_root=tmp_path,
         output_dir=bundle_dir,
         force=True,
+        use_census_geolookup=False,
     )
 
     assert output_dir == bundle_dir
@@ -2971,6 +3127,7 @@ def test_main_runs_public_report_bundle_command(tmp_path, monkeypatch, capsys):
         reproduction_status_path=None,
         resume=False,
         force=False,
+        use_census_geolookup=True,
     ):
         output_dir = Path(output_dir)
         output_dir.mkdir(parents=True, exist_ok=True)

@@ -19,4 +19,6 @@ Track the durable inputs and recipes instead:
 
 Regenerate the local bundle whenever you need the HTML map, GeoPackages, manifest,
 status JSON, deviation note, ranked CSV, cumulative buildout surfaces, or cached
-state-boundary source ZIP.
+state-boundary source ZIP. The default run also writes a generated
+`public_report_census_geography_cache.json` file for Census coordinate GeoLookup
+identity enrichment; pass `--no-census-geolookup` to skip that online enrichment.

@@ -257,10 +257,14 @@ Behavior:
   water/wetland cells to `0` suitability percentile.
 - The ranked suitability CSV orders those feasible cells nationwide by percentile,
   score, and developable capacity so the bundle has a report-facing scored table as
-  well as map layers. Cell labels now carry a bounded geographic identity stack:
-  stable unique `cell_name` values for joins, `local_cell_name` for the most
-  specific available place identity, `general_american_cell_name` for report-facing
-  recognition, and `identity_stack_json` for the ordered identity layers.
+  well as map layers. Cell labels now carry a bounded geographic identity stack.
+  By default the bundle calls the U.S. Census coordinate GeoLookup API and caches
+  normalized Census geography fields in the output directory; pass
+  `--no-census-geolookup` for the fully offline bounded-catalog fallback. The CSV
+  preserves stable unique `cell_name` values for joins, `local_cell_name` for the
+  most specific available place identity, `general_american_cell_name` for
+  report-facing recognition, `identity_stack_json` for the ordered identity layers,
+  and `census_*` columns for the official geography source values.
 - The D3 map HTML page embeds the bounded feasible-land and suitability surfaces in a single browser-rendered file so you can inspect the map without opening GIS software. The underlying grid remains the internal model, but the browser display draws grid-backed cells as fitted hexagons for quicker visual scanning. Water/wetland-flagged cells remain in the map footprint at `0` suitability percentile. Optional state-boundary, zoning-proxy, permitting / ordinance evidence, social-friction evidence, and hosting-capacity proxy layers provide bounded context overlays without replacing the base suitability surface.
 - The assumption registry JSON records the current scenario inputs, report-reference
   assumptions, bounded bundle rules, output labels, and explicit assumption gaps so
