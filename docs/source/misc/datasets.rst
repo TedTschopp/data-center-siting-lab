@@ -237,12 +237,14 @@ bounded geographic identity stack. By default the report bundle enriches each ce
 with the U.S. Census coordinate GeoLookup API and caches those generated responses
 in the output directory; ``--no-census-geolookup`` keeps the fully offline bounded
 catalog fallback. The outputs preserve a stable unique ``cell_name`` for row joins
-and disambiguation, plus ``local_cell_name``, ``general_american_cell_name``,
-``identity_stack_json``, and normalized ``census_*`` geography fields so the map
-can choose the useful layer for its audience. Census-backed labels use official
-place, county subdivision, county, metro area, state, Census division, and Census
-region names when available. Naming basis fields remain in the data outputs and
-map tooltip rather than being appended to the visible table label.
+and disambiguation, report-facing ``display_cell_name`` and
+``display_context_name`` fields for the map and ranked table, plus
+``local_cell_name``, ``general_american_cell_name``, ``identity_stack_json``, and
+normalized ``census_*`` geography fields so the map can choose the useful layer for
+its audience. Census-backed labels use official place, county subdivision, county,
+metro area, state, Census division, and Census region names when available. Naming
+basis fields remain in the data outputs and map tooltip rather than being appended
+to the visible table label.
 
 The D3 suitability map HTML page uses a single self-contained browser document to
 render the bounded feasible-land and suitability surfaces directly from embedded

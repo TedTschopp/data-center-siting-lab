@@ -96,16 +96,17 @@ for that derived workflow.
 
 The bounded bundle now gives each ranked suitability cell a deterministic human-readable name.
 
-The current rule is intentionally self-contained and offline so the bundle remains repeatable under test.
+The fallback rule is intentionally self-contained and offline so the bundle remains repeatable under test.
 
 1. By default the report bundle calls the U.S. Census coordinate GeoLookup API for each retained cell and caches normalized generated responses in `public_report_census_geography_cache.json` under the output directory. Pass `--no-census-geolookup` to keep the fully offline bounded-catalog fallback.
 2. The repo still uses curated public catalogs of major U.S. metropolitan names, major natural-feature or monument names, and gateway place anchors as fallback context and landmark support. Census geography is authoritative for place, county subdivision, county, metro area, state, Census division, and Census region when available.
 3. For each cell, the workflow reprojects cell geometry to EPSG:4326 for point-in-polygon checks and replaces missing or projected coordinate columns with a geographic representative point before nearest-place matching or Census lookup.
 4. The workflow builds a geographic identity stack for each cell: exact point, landmark/address, neighborhood, district, city, county, metro area, state region, state, national region, and country. Layers without current public data, such as neighborhood, remain null instead of guessed.
 5. The local label chooses the most specific useful layer available, preferring Census incorporated/CDP place, Census county subdivision, county, nearby landmark, then coordinates.
-6. The general American label chooses the smallest broadly recognizable official layer: Census place when present, Census metro area when present, otherwise Census division, state, or fallback catalog/state labels.
-7. The legacy `cell_name` remains a stable unique row label for CSV joins and disambiguation. Census-backed names use the official intersecting geography as the base label; duplicate row labels are expanded with available county/state context and coordinates only when needed.
-8. The D3 map table uses the general American label as the primary display label and shows the local label as secondary context when it adds information. Naming basis, match type, Census fields, and identity-stack metadata remain available as CSV/GeoPackage fields and in the cell tooltip rather than appearing as visible suffixes such as `metro name` or `natural name`.
+6. The general American label remains an identity-stack field that chooses the smallest broadly recognizable official layer: Census place when present, Census metro area when present, otherwise Census division, state, or fallback catalog/state labels.
+7. The report-facing display label is separate from the join label. `display_cell_name` prefers the most specific useful official geography with state context, such as `Scotch Plains township, New Jersey`; generic districts such as `District 3` also include county context. `display_context_name` carries the broader recognition layer, such as metro, combined statistical area, or urban area, when that helps the audience interpret the local label.
+8. The legacy `cell_name` remains a stable unique row label for CSV joins and disambiguation. Census-backed names use the official intersecting geography as the base label; duplicate row labels are expanded with available county/state context and coordinates only when needed.
+9. The D3 map table uses `display_cell_name` as the primary visible label and shows `display_context_name` as secondary context when it adds information. Naming basis, match type, Census fields, and identity-stack metadata remain available as CSV/GeoPackage fields and in the cell tooltip rather than appearing as visible suffixes such as `metro name` or `natural name`.
 
 That rule is reproducible and based on public Census geography when online lookup is enabled, but it is still a bounded public approximation rather than a report-sourced naming layer.
 

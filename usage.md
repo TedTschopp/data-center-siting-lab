@@ -261,10 +261,11 @@ Behavior:
   By default the bundle calls the U.S. Census coordinate GeoLookup API and caches
   normalized Census geography fields in the output directory; pass
   `--no-census-geolookup` for the fully offline bounded-catalog fallback. The CSV
-  preserves stable unique `cell_name` values for joins, `local_cell_name` for the
+  preserves stable unique `cell_name` values for joins, `display_cell_name` and
+  `display_context_name` for the report table and map, `local_cell_name` for the
   most specific available place identity, `general_american_cell_name` for
-  report-facing recognition, `identity_stack_json` for the ordered identity layers,
-  and `census_*` columns for the official geography source values.
+  broader recognition, `identity_stack_json` for the ordered identity layers, and
+  `census_*` columns for the official geography source values.
 - The D3 map HTML page embeds the bounded feasible-land and suitability surfaces in a single browser-rendered file so you can inspect the map without opening GIS software. The underlying grid remains the internal model, but the browser display draws grid-backed cells as fitted hexagons for quicker visual scanning. Water/wetland-flagged cells remain in the map footprint at `0` suitability percentile. Optional state-boundary, zoning-proxy, permitting / ordinance evidence, social-friction evidence, and hosting-capacity proxy layers provide bounded context overlays without replacing the base suitability surface.
 - The assumption registry JSON records the current scenario inputs, report-reference
   assumptions, bounded bundle rules, output labels, and explicit assumption gaps so

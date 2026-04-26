@@ -2444,6 +2444,10 @@ def test_annotate_public_report_cell_names_uses_census_geolookup_identity():
         "New York-Newark-Jersey City, NY-NJ Metro Area"
     )
     assert named.loc[0, "general_american_cell_name_layer"] == "metro_area"
+    assert named.loc[0, "display_cell_name"] == "Scotch Plains township, New Jersey"
+    assert named.loc[0, "display_cell_name_layer"] == "district"
+    assert named.loc[0, "display_context_name"] == "New York-Newark-Jersey City, NY-NJ metro"
+    assert named.loc[0, "display_context_name_layer"] == "metro_area"
     assert stack_by_layer["city"] is None
     assert stack_by_layer["district"] == "Scotch Plains township"
     assert stack_by_layer["county"] == "Union County"
@@ -2890,7 +2894,10 @@ def test_run_public_report_bundle_writes_manifest_and_deviation_note(tmp_path, m
     assert "suitability-hex" in suitability_map_html
     assert "is-active" in suitability_map_html
     assert "displayCellName(row)" in suitability_map_html
+    assert "displayContextCellName(row)" in suitability_map_html
     assert "normalizeDisplayName" in suitability_map_html
+    assert "display_cell_name" in suitability_map_html
+    assert "display_context_name" in suitability_map_html
     assert "general_american_cell_name" in suitability_map_html
     assert "local_cell_name" in suitability_map_html
     assert "Identity stack:" in suitability_map_html
@@ -3040,6 +3047,8 @@ def test_run_public_report_bundle_writes_manifest_and_deviation_note(tmp_path, m
     assert suitability["suitability_percentile"].tolist() == [0.0, 83.333333, 50.0]
     assert "cell_name" in suitability.columns
     assert "base_cell_name" in suitability.columns
+    assert "display_cell_name" in suitability.columns
+    assert "display_context_name" in suitability.columns
     assert "local_cell_name" in suitability.columns
     assert "general_american_cell_name" in suitability.columns
     assert "identity_stack_json" in suitability.columns
@@ -3060,6 +3069,8 @@ def test_run_public_report_bundle_writes_manifest_and_deviation_note(tmp_path, m
     assert ranked_suitability["suitability_percentile"].tolist() == [83.333333, 50.0, 0.0]
     assert "cell_name" in ranked_suitability.columns
     assert "base_cell_name" in ranked_suitability.columns
+    assert "display_cell_name" in ranked_suitability.columns
+    assert "display_context_name" in ranked_suitability.columns
     assert "local_cell_name" in ranked_suitability.columns
     assert "general_american_cell_name" in ranked_suitability.columns
     assert "identity_stack_json" in ranked_suitability.columns

@@ -4004,6 +4004,11 @@ def _write_public_report_bundle_readme(output_dir):
                 "The generated bundle artifacts in this directory are intentionally not tracked in Git.",
                 "They are report deliverables, but they are regenerated deliverables.",
                 "",
+                "Current decision: keep the generated HTML, GeoPackages, CSVs, JSON status files, and",
+                "Census cache out of source control. If a reviewed snapshot must be shared, publish or",
+                "package that snapshot as an explicit release artifact instead of relaxing the ignore",
+                "rules for this directory.",
+                "",
                 "Track the durable inputs and recipes instead:",
                 "",
                 "- source code and regression tests",
@@ -4821,6 +4826,110 @@ def _build_public_report_identity_fields(
     }
 
 
+def _normalize_public_report_display_text(value):
+    text = _clean_public_report_text(value)
+    if text is None:
+        return None
+    return re.sub(r"[^a-z0-9]+", " ", text.lower()).strip()
+
+
+def _public_report_text_contains_name(value, contained_value):
+    value_text = _normalize_public_report_display_text(value)
+    contained_text = _normalize_public_report_display_text(contained_value)
+    if value_text is None or contained_text is None:
+        return False
+    return f" {contained_text} " in f" {value_text} "
+
+
+def _join_public_report_display_location_parts(*parts):
+    joined_parts = []
+    for part in parts:
+        text = _clean_public_report_text(part)
+        if text is None:
+            continue
+        if any(_public_report_text_contains_name(existing, text) for existing in joined_parts):
+            continue
+        joined_parts.append(text)
+    return ", ".join(joined_parts) if joined_parts else None
+
+
+def _is_generic_public_report_district_name(value):
+    text = _normalize_public_report_display_text(value)
+    return bool(text and re.fullmatch(r"(district|precinct|ward) [a-z0-9]+", text))
+
+
+def _format_public_report_display_context_name(value, layer):
+    text = _clean_public_report_text(value)
+    if text is None:
+        return None
+    if layer == "metro_area":
+        return re.sub(r"\s+Metro Area$", " metro", text)
+    if layer == "urban_area":
+        return re.sub(r"\s+Urban Area$", " urban area", text)
+    return text
+
+
+def _build_public_report_display_label_fields(row):
+    local_name = _clean_public_report_text(row.get("local_cell_name"))
+    local_layer = _clean_public_report_text(row.get("local_cell_name_layer"))
+    general_name = _clean_public_report_text(row.get("general_american_cell_name"))
+    general_layer = _clean_public_report_text(row.get("general_american_cell_name_layer"))
+    state_name = _clean_public_report_text(row.get("census_state_name"))
+    county_name = _clean_public_report_text(row.get("census_county_name"))
+    cell_name = _clean_public_report_text(row.get("cell_name"))
+
+    if local_name is not None:
+        include_county = local_layer == "district" and _is_generic_public_report_district_name(local_name)
+        display_name = _join_public_report_display_location_parts(
+            local_name,
+            county_name if include_county else None,
+            state_name,
+        )
+        display_layer = local_layer
+    elif general_name is not None:
+        display_name = general_name
+        display_layer = general_layer
+    else:
+        display_name = cell_name or "Unnamed suitability cell"
+        display_layer = "cell"
+
+    context_candidates = []
+    if local_layer != "city":
+        context_candidates.extend(
+            [
+                (row.get("census_metro_area_name"), "metro_area"),
+                (row.get("census_combined_statistical_area_name"), "combined_statistical_area"),
+                (row.get("census_urban_area_name"), "urban_area"),
+            ]
+        )
+    if general_name is not None and general_layer != display_layer:
+        context_candidates.append((general_name, general_layer))
+
+    context_name = None
+    context_layer = None
+    for candidate_name, candidate_layer in context_candidates:
+        formatted_context_name = _format_public_report_display_context_name(
+            candidate_name,
+            candidate_layer,
+        )
+        if formatted_context_name is None:
+            continue
+        if _normalize_public_report_display_text(formatted_context_name) == _normalize_public_report_display_text(
+            display_name
+        ):
+            continue
+        context_name = formatted_context_name
+        context_layer = candidate_layer
+        break
+
+    return {
+        "display_cell_name": display_name,
+        "display_cell_name_layer": display_layer,
+        "display_context_name": context_name,
+        "display_context_name_layer": context_layer,
+    }
+
+
 def _select_public_report_census_cell_name_choice(census_geography):
     """Return a Census-backed base label for stable cell naming when available."""
     if not census_geography or census_geography.get("census_geolookup_status") != "matched":
@@ -4916,6 +5025,10 @@ def _make_public_report_cell_names_unique(frame):
                 axis=1,
             )
         named.loc[duplicate_mask, "cell_name_is_disambiguated"] = True
+
+    display_fields = named.apply(_build_public_report_display_label_fields, axis=1).apply(pd.Series)
+    for column in display_fields.columns:
+        named[column] = display_fields[column]
 
     return named
 
@@ -5059,6 +5172,10 @@ def _build_public_report_ranked_suitability_summary(frame):
         "cell_id",
         "cell_name",
         "base_cell_name",
+        "display_cell_name",
+        "display_cell_name_layer",
+        "display_context_name",
+        "display_context_name_layer",
         "local_cell_name",
         "local_cell_name_layer",
         "general_american_cell_name",
@@ -6682,15 +6799,15 @@ def _write_public_report_suitability_map(
             return scopeLabel ? `${{scopeLabel}} ${{basisLabel}}` : basisLabel;
         }};
         const normalizeDisplayName = (value) => (value ?? "").toString().toLowerCase().replace(/[^a-z0-9]+/g, " ").trim();
-        const displayCellName = (row) => row?.general_american_cell_name ?? row?.cell_name ?? `Cell ${{cellKeyFromObject(row)}}`;
-        const displayLocalCellName = (row) => {{
-            const localName = row?.local_cell_name;
-            const localDisplayName = normalizeDisplayName(localName);
+        const displayCellName = (row) => row?.display_cell_name ?? row?.general_american_cell_name ?? row?.cell_name ?? `Cell ${{cellKeyFromObject(row)}}`;
+        const displayContextCellName = (row) => {{
+            const contextName = row?.display_context_name ?? row?.local_cell_name;
+            const contextDisplayName = normalizeDisplayName(contextName);
             const generalDisplayName = normalizeDisplayName(displayCellName(row));
-            if (!localDisplayName || !generalDisplayName) {{
-                return localName ?? null;
+            if (!contextDisplayName || !generalDisplayName) {{
+                return contextName ?? null;
             }}
-            return ` ${{generalDisplayName}} `.includes(` ${{localDisplayName}} `) ? null : localName;
+            return ` ${{generalDisplayName}} `.includes(` ${{contextDisplayName}} `) ? null : contextName;
         }};
         const renderTooltip = (props, cellKey, zoningProps, permittingProps, socialFrictionProps, hostingProps) => {{
             const zoningClass = zoningProps?.zoning_proxy_class ?? "unknown";
@@ -6739,7 +6856,7 @@ def _write_public_report_suitability_map(
                 <td>${{row.national_rank ?? ""}}</td>
                 <td>
                     <span class="cell-name">${{displayCellName(row)}}</span>
-                    ${{displayLocalCellName(row) ? `<span class="cell-meta">${{displayLocalCellName(row)}}</span>` : ""}}
+                    ${{displayContextCellName(row) ? `<span class="cell-meta">${{displayContextCellName(row)}}</span>` : ""}}
                 </td>
                 <td>${{row.suitability_percentile == null ? "" : d3.format(".1f")(row.suitability_percentile)}}</td>
                 <td>${{row.developable_capacity_mw == null ? "" : d3.format(",.0f")(row.developable_capacity_mw)}}</td>

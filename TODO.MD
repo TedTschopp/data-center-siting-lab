@@ -65,12 +65,15 @@ public-source approximation.
 Keep this section aligned with the open checklist below. When priorities or
 dependencies change, update this order in the same change.
 
-Current recommended next action: pursue true report-parity blockers now that the
-bounded report map and ranked table have cleaner stakeholder-facing labels.
+Current recommended next action: classify unresolved Census GeoLookup misses for
+retained cells, then return to true report-parity blockers now that the bounded
+report map and ranked table have cleaner stakeholder-facing labels.
 
 Immediate follow-up order:
 
-1. Pursue true report-parity blockers, including baseline-year assumptions,
+1. Classify unresolved Census GeoLookup misses for coastal, offshore, or otherwise
+      unmatched retained cells, and improve fallback display names where needed.
+2. Pursue true report-parity blockers, including baseline-year assumptions,
       utilization handling, grid resolution, exact downscaling rules, and Baxtel
       suitability-surface parity.
 
@@ -756,10 +759,23 @@ Immediate follow-up order:
       Outcome: reopened and completed with a geographic identity-stack model. The
       bounded naming workflow now emits stable unique row labels plus
       `local_cell_name`, `general_american_cell_name`, and `identity_stack_json`.
-      The D3 ranked table uses the general American label as the primary display
-      layer and shows local identity as secondary context when useful. Basis,
+      The D3 ranked table now uses explicit `display_cell_name` values as the
+      primary visible label and `display_context_name` as secondary context when
+      useful, while retaining local/general identity fields for metadata. Basis,
       match scope, and stack metadata remain in output fields and the cell tooltip
       rather than visible suffixes like `metro name` or `natural name`.
+
+- [ ] 46. Classify unresolved Census GeoLookup misses in retained report cells.
+      Evidence: the regenerated bounded report bundle matched 3,758 of 3,911 retained
+      cells through Census coordinate GeoLookup, leaving 153 retained cells with
+      missing Census identity fields. These are likely coastal, offshore, or
+      otherwise outside the geocoder's named geography response surface, but that
+      assumption should be verified.
+      Required outcome: summarize the missing cells by location, state/region
+      fallback, water/wetland exclusion status, and map impact; decide whether the
+      current bounded-catalog fallback is sufficient or whether coastal/offshore
+      display naming needs a dedicated rule; document the decision and regression-test
+      any naming change.
 
 ## Ongoing Rule
 
