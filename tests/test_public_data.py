@@ -3185,7 +3185,14 @@ def test_run_public_report_bundle_writes_manifest_and_deviation_note(tmp_path, m
 
     suitability_map_html = suitability_map_path.read_text()
     assert "https://d3js.org/d3.v7.min.js" in suitability_map_html
-    assert "Bounded Public Suitability Map" in suitability_map_html
+    assert "Executive Siting and Buildout View" in suitability_map_html
+    assert "Executive Planning Readout" in suitability_map_html
+    assert "Executive Readout" in suitability_map_html
+    assert "Decision Lens" in suitability_map_html
+    assert "Risk Overlays" in suitability_map_html
+    assert "Priority Candidates" in suitability_map_html
+    assert "portfolio screening" in suitability_map_html
+    assert "The browser page keeps every developable execution-grid cell" not in suitability_map_html
     assert "suitabilityGeoJson" in suitability_map_html
     assert "stateBoundaryGeoJson" in suitability_map_html
     assert "hostingProxyGeoJson" in suitability_map_html
@@ -3231,8 +3238,11 @@ def test_run_public_report_bundle_writes_manifest_and_deviation_note(tmp_path, m
     assert "cumulative_total_dc_load_mw" in suitability_map_html
     assert "cumulative_new_dc_load_mw" in suitability_map_html
     assert "cumulative_total_dc_capacity_mw" in suitability_map_html
-    assert "Selected year:" in suitability_map_html
-    assert "Buildout source:" in suitability_map_html
+    assert "Planning year:" in suitability_map_html
+    assert "Buildout scenario:" in suitability_map_html
+    assert "Cumulative portfolio load" in suitability_map_html
+    assert "Cumulative growth load" in suitability_map_html
+    assert "Cumulative capacity equivalent" in suitability_map_html
     assert "public_eer_total_downscaled" in suitability_map_html
     assert "hex-state-boundary" in suitability_map_html
     assert "buildHexStateBoundarySegments" in suitability_map_html

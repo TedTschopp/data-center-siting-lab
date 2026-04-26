@@ -7210,20 +7210,20 @@ def _build_public_report_buildout_timeline_payload(output_dir):
         "metrics": [
             {
                 "id": "cumulative_total_dc_load_mw",
-                "label": "Cumulative total load",
-                "shortLabel": "Total load",
+                "label": "Cumulative portfolio load",
+                "shortLabel": "Portfolio load",
                 "unit": "MW",
             },
             {
                 "id": "cumulative_new_dc_load_mw",
-                "label": "Cumulative new load",
-                "shortLabel": "New load",
+                "label": "Cumulative growth load",
+                "shortLabel": "Growth load",
                 "unit": "MW",
             },
             {
                 "id": "cumulative_total_dc_capacity_mw",
-                "label": "Cumulative total capacity",
-                "shortLabel": "Total capacity",
+                "label": "Cumulative capacity equivalent",
+                "shortLabel": "Capacity equivalent",
                 "unit": "MW",
             },
         ],
@@ -7279,7 +7279,7 @@ def _write_public_report_suitability_map(
 <head>
     <meta charset=\"utf-8\">
     <meta name=\"viewport\" content=\"width=device-width, initial-scale=1\">
-    <title>Bounded Public Suitability Map</title>
+    <title>Executive Siting and Buildout View</title>
     <script src=\"https://d3js.org/d3.v7.min.js\"></script>
     <script>
         (() => {{
@@ -7741,9 +7741,9 @@ def _write_public_report_suitability_map(
 <body>
     <div class=\"page\">
         <header class=\"hero\">
-            <span class=\"eyebrow\">Bounded Public Bundle · D3 Map</span>
-            <h1>Bounded Public Suitability Map</h1>
-            <p>This single-page map renders the current bounded feasible-land and suitability-percentile surfaces directly in the browser, with a geographic square view and a display-only honeycomb hex view while keeping the original grid geometry and cell IDs as the internal model. It is a quick visual screen, not a report-equivalent nationwide siting product.</p>
+            <span class=\"eyebrow\">Executive Planning Readout</span>
+            <h1>Executive Siting and Buildout View</h1>
+            <p>This report summarizes where the bounded public approximation concentrates data-center siting advantage, how modeled demand accumulates over time, and which contextual risks should shape the next leadership discussion. Use it for portfolio screening and prioritization, not as a parcel-level entitlement or report-equivalent reproduction.</p>
         </header>
         <div class=\"layout\">
             <section class=\"card map-card\">
@@ -7762,77 +7762,77 @@ def _write_public_report_suitability_map(
                     <svg id=\"map\" viewBox=\"0 0 960 640\" preserveAspectRatio=\"xMidYMid meet\"></svg>
                 </div>
                 <div class=\"legend\">
-                    <p class="note">The browser page keeps every developable execution-grid cell in view and uses the existing <strong>suitability_score</strong> field for ranking. Cells meeting the staged NLCD water/wetland screen remain visible but are clamped to 0 suitability percentile. The display layer can show geographically aligned square cells or honeycomb hexes for scanning, while preserving grid cell IDs for table, tooltip, and layer joins. State context uses true Census boundaries in Squares and snapped cell-edge outlines in Hexes. It now adds coarse zoning, permitting evidence, social-friction evidence, and hosting-capacity proxy layers, but those overlays remain screening proxies rather than entitlement, acceptance, or interconnection determinations.</p>
+                    <p class="note">Color shows relative screening strength or the selected buildout measure. The view keeps the portfolio footprint visible, including water and wetland exclusions clamped to 0 suitability, so leadership can see both opportunity and screened-out geography. Risk overlays are directional signals for due diligence; they do not establish entitlement, community acceptance, or interconnection feasibility.</p>
                     <div class=\"legend-bar\"></div>
                     <span id="legend-label">Higher suitability percentile</span>
                 </div>
             </section>
             <aside class=\"card panel\">
                 <div>
-                    <span class=\"eyebrow\">Quick Read</span>
-                    <p class="note">The browser page keeps every developable execution-grid cell in view and uses the existing <strong>suitability_score</strong> field for ranking. Cells meeting the staged NLCD water/wetland screen remain visible but are clamped to 0 suitability percentile. The display layer can show geographically aligned square cells or honeycomb hexes for scanning, while preserving grid cell IDs for table, tooltip, and layer joins. State context uses true Census boundaries in Squares and snapped cell-edge outlines in Hexes. It now adds coarse zoning, permitting evidence, social-friction evidence, and hosting-capacity proxy layers, but those overlays remain screening proxies rather than entitlement, acceptance, or interconnection determinations.</p>
+                    <span class=\"eyebrow\">Executive Readout</span>
+                    <p class="note">Read this as a portfolio decision screen. The map highlights candidate geography, modeled buildout pressure, and contextual risk indicators in one place so leaders can align on where to investigate next, which assumptions are bounded, and what evidence is still needed before investment or policy decisions.</p>
                 </div>
                 <section>
                     <div class=\"stat-grid\">
                         <div class=\"stat\">
-                            <div class=\"stat-label\">Feasible Cells</div>
+                            <div class=\"stat-label\">Candidate Footprint</div>
                             <div class=\"stat-value\" id=\"feasible-count\">0</div>
                         </div>
                         <div class=\"stat\">
-                            <div class=\"stat-label\">Mapped Cells</div>
+                            <div class=\"stat-label\">Screened Cells</div>
                             <div class=\"stat-value\" id=\"mapped-count\">0</div>
                         </div>
                         <div class=\"stat\">
-                            <div class=\"stat-label\">Top Percentile</div>
+                            <div class=\"stat-label\">Highest Score</div>
                             <div class=\"stat-value\" id=\"top-percentile\">0</div>
                         </div>
                         <div class=\"stat\">
-                            <div class=\"stat-label\">Percentile Range</div>
+                            <div class=\"stat-label\">Score Range</div>
                             <div class=\"stat-value\" id=\"percentile-range\">0–0</div>
                         </div>
                     </div>
                 </section>
                 <section class="note timeline-panel" id="buildout-timeline-panel">
-                    <span class="eyebrow">Map Mode</span>
+                    <span class="eyebrow">Decision Lens</span>
                     <div class="mode-control" role="group" aria-label="Map mode">
                         <button type="button" class="mode-toggle is-active" id="suitability-mode-toggle" aria-pressed="true">Suitability</button>
                         <button type="button" class="mode-toggle" id="buildout-mode-toggle" aria-pressed="false">Buildout</button>
                     </div>
                     <div class="timeline-controls">
                         <label class="timeline-control" for="buildout-source-select">
-                            Source
+                            Scenario
                             <select id="buildout-source-select"></select>
                         </label>
                         <label class="timeline-control" for="buildout-metric-select">
-                            Metric
+                            Measure
                             <select id="buildout-metric-select"></select>
                         </label>
                         <label class="timeline-control timeline-year-row" for="buildout-year-range">
-                            Year <strong id="buildout-year-label">n/a</strong>
+                            Planning Year <strong id="buildout-year-label">n/a</strong>
                             <input type="range" id="buildout-year-range" min="0" max="0" step="1" value="0">
                         </label>
                     </div>
                     <div class="timeline-summary">
                         <div class="stat">
-                            <div class="stat-label">Total Load</div>
+                            <div class="stat-label">Portfolio Load</div>
                             <div class="stat-value" id="selected-buildout-total-load">n/a</div>
                         </div>
                         <div class="stat">
-                            <div class="stat-label">New Load</div>
+                            <div class="stat-label">Growth Load</div>
                             <div class="stat-value" id="selected-buildout-new-load">n/a</div>
                         </div>
                         <div class="stat">
-                            <div class="stat-label">Capacity</div>
+                            <div class="stat-label">Capacity Equivalent</div>
                             <div class="stat-value" id="selected-buildout-capacity">n/a</div>
                         </div>
                     </div>
                 </section>
                 <section>
-                    <span class="eyebrow">Context Layers</span>
+                    <span class="eyebrow">Risk Overlays</span>
                     <div class="layer-stack">
                         <div class="note layer-panel">
                             <button type="button" class="layer-toggle" id="zoning-layer-toggle" aria-pressed="false">Show Zoning Proxy</button>
-                            <p class="layer-note">Zoning Proxy: NLCD developed-land context transferred to the execution grid. This is not parcel zoning or an allowed-use decision.</p>
+                            <p class="layer-note">Zoning Proxy: early land-use context. Treat as a due-diligence prompt, not parcel zoning or an allowed-use decision.</p>
                             <div class="layer-legend">
                                 <span class="layer-chip"><span class="layer-swatch" style="background: rgba(129, 140, 115, 0.42);"></span>Non-developed context</span>
                                 <span class="layer-chip"><span class="layer-swatch" style="background: rgba(209, 168, 72, 0.42);"></span>Developed neighborhood</span>
@@ -7841,7 +7841,7 @@ def _write_public_report_suitability_map(
                         </div>
                         <div class="note layer-panel">
                             <button type="button" class="layer-toggle" id="permitting-layer-toggle" aria-pressed="false">Show Permitting / Ordinance Proxy</button>
-                            <p class="layer-note">Permitting / Ordinance Proxy: manually curated public evidence points assigned to execution-grid cells. This is not permit readiness, legal entitlement, or ordinance compatibility.</p>
+                            <p class="layer-note">Permitting / Ordinance Proxy: public evidence that may affect execution risk. It is not permit readiness, legal entitlement, or ordinance compatibility.</p>
                             <div class="layer-legend">
                                 <span class="layer-chip"><span class="layer-swatch" style="background: rgba(108, 115, 103, 0.08);"></span>No public evidence recorded</span>
                                 <span class="layer-chip"><span class="layer-swatch" style="background: rgba(12, 92, 89, 0.40);"></span>Permit activity record</span>
@@ -7851,7 +7851,7 @@ def _write_public_report_suitability_map(
                         </div>
                         <div class="note layer-panel">
                             <button type="button" class="layer-toggle" id="social-friction-layer-toggle" aria-pressed="false">Show Social-Friction Proxy</button>
-                            <p class="layer-note">Social-Friction Proxy: manually curated public evidence points assigned to execution-grid cells. This is not a measure of actual community acceptance or social license.</p>
+                            <p class="layer-note">Social-Friction Proxy: public concern and engagement evidence that may affect stakeholder strategy. It is not a measure of actual community acceptance or social license.</p>
                             <div class="layer-legend">
                                 <span class="layer-chip"><span class="layer-swatch" style="background: rgba(108, 115, 103, 0.08);"></span>No public evidence recorded</span>
                                 <span class="layer-chip"><span class="layer-swatch" style="background: rgba(12, 92, 89, 0.36);"></span>Engagement record</span>
@@ -7861,7 +7861,7 @@ def _write_public_report_suitability_map(
                         </div>
                         <div class="note layer-panel">
                             <button type="button" class="layer-toggle" id="hosting-layer-toggle" aria-pressed="false">Show Hosting Capacity Proxy</button>
-                            <p class="layer-note">Hosting Capacity Proxy: regional NERC reserve-margin headroom for 2026-2030 transferred to the execution grid. This is not local interconnection or hosting-capacity headroom.</p>
+                            <p class="layer-note">Hosting Capacity Proxy: regional headroom context for planning discussion. It is not local interconnection or hosting-capacity approval.</p>
                             <div class="layer-legend">
                                 <span class="layer-chip"><span class="layer-swatch" style="background: rgba(159, 45, 32, 0.78);"></span>Deficit</span>
                                 <span class="layer-chip"><span class="layer-swatch" style="background: rgba(198, 92, 19, 0.68);"></span>Tight</span>
@@ -7872,7 +7872,7 @@ def _write_public_report_suitability_map(
                     </div>
                 </section>
                 <section>
-                    <span class=\"eyebrow\">Top Ranked Cells</span>
+                    <span class=\"eyebrow\">Priority Candidates</span>
                     <table>
                         <thead>
                             <tr>
@@ -8115,8 +8115,8 @@ def _write_public_report_suitability_map(
             const proxyLabel = hostingProxyClassLabels[proxyClass] ?? hostingProxyClassLabels.unknown;
             const metric = selectedBuildoutMetric();
             const buildoutLines = buildoutProps ? `
-                    Buildout source: ${{selectedBuildoutSource()?.label ?? "n/a"}}<br>
-                    Selected year: ${{buildoutProps.year ?? selectedBuildoutYear ?? "n/a"}}<br>
+                    Buildout scenario: ${{selectedBuildoutSource()?.label ?? "n/a"}}<br>
+                    Planning year: ${{buildoutProps.year ?? selectedBuildoutYear ?? "n/a"}}<br>
                     ${{metric.shortLabel ?? metric.label}}: ${{formatMw(buildoutProps[metric.id])}}<br>
                     Cumulative total load: ${{formatMw(buildoutProps.cumulative_total_dc_load_mw)}}<br>
                     Cumulative new load: ${{formatMw(buildoutProps.cumulative_new_dc_load_mw)}}<br>
