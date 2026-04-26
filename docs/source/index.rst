@@ -4,6 +4,7 @@
    Home page <self>
    Installation and Usage <misc/installation_usage>
    Dataset Sourcing <misc/datasets>
+   Data Center Report Bundle <misc/data_center_report_bundle>
    Examples <misc/examples>
    CLI reference <_cli/cli>
    API reference <_autosummary/reVeal>

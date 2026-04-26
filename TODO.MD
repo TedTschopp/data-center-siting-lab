@@ -65,14 +65,19 @@ public-source approximation.
 Keep this section aligned with the open checklist below. When priorities or
 dependencies change, update this order in the same change.
 
-Current recommended next action: perform a final report-bundle QA pass and add new
-backlog items for any remaining usability or parity gaps. The numbered report-bundle
-blockers currently listed below are complete.
+Current recommended next action: complete publication readiness. Review ownership,
+remote, package, documentation, citation, and release metadata before publishing the
+repository under a `TedTschopp` account. The numbered report-bundle blockers
+currently listed below are complete.
 
 Immediate follow-up order:
 
-1. Review the generated HTML report and regenerated contract artifacts end to end.
-2. If Baxtel access is later obtained, place the licensed/sample CSV at the tracked
+1. Run the publishing validation checklist in `PUBLISHING.md` and confirm generated
+      report-bundle artifacts are not staged.
+2. Decide whether the published repository is a fork, a renamed derivative package,
+      or an internal analysis repository, then update metadata in one deliberate
+      change.
+3. If Baxtel access is later obtained, place the licensed/sample CSV at the tracked
       local path and rerun the Baxtel schema contract before revisiting trained
       suitability parity.
 

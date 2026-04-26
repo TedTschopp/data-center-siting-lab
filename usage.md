@@ -61,8 +61,8 @@ If that snapshot is interrupted, resume it with:
 
 ```bash
 python -m reVeal.public_data download-ribits-bank-sites \
-	--output-path external-data/raw/ribits/ribits_bank_sites_snapshot.json \
-	--resume
+  --output-path external-data/raw/ribits/ribits_bank_sites_snapshot.json \
+  --resume
 ```
 
 Use `--checkpoint-path` if you want the resume state written somewhere other than
@@ -72,21 +72,21 @@ Behavior:
 
 - Direct datasets download to the configured raw path.
 - Manual datasets create a repo-local note file that documents the expected payload
-	or schema.
+  or schema.
 - Some manual datasets also support `--download-representative` for one concrete
-	sample payload.
+  sample payload.
 - RIBITS uses a dedicated snapshot command rather than `--download-representative`
-	because the public source is exposed as list/detail webservices instead of a single
-	package download.
+  because the public source is exposed as list/detail webservices instead of a single
+  package download.
 - Direct and representative download commands now print byte progress to stderr while
-	they run.
+  they run.
 - The RIBITS snapshot command prints bank-site progress to stderr as each detail
-	payload is processed.
+  payload is processed.
 - Stop a running download with `Ctrl+C`.
 - Resume a partial direct or representative download by rerunning the same
-	`stage-dataset` command with `--resume`.
+  `stage-dataset` command with `--resume`.
 - Resume a partial RIBITS snapshot by rerunning `download-ribits-bank-sites` with
-	`--resume`.
+  `--resume`.
 
 For the generated public proxy workflows, stage a runnable example bundle with:
 
@@ -112,10 +112,10 @@ Build one directly with:
 
 ```bash
 python -m reVeal.public_data build-fema-download-url \
-	--dfirm-id 01001C \
-	--state Alabama \
-	--county "Autauga County" \
-	--file-name 01001C_20231225.zip
+  --dfirm-id 01001C \
+  --state Alabama \
+  --county "Autauga County" \
+  --file-name 01001C_20231225.zip
 ```
 
 You can pass the same arguments through `stage-dataset` to stage the FEMA note and
@@ -123,12 +123,12 @@ download one representative community package through the same CLI surface:
 
 ```bash
 python -m reVeal.public_data stage-dataset fema_nfhl \
-	--repo-root . \
-	--download-representative \
-	--dfirm-id 01001C \
-	--state Alabama \
-	--county "Autauga County" \
-	--file-name 01001C_20231225.zip
+  --repo-root . \
+  --download-representative \
+  --dfirm-id 01001C \
+  --state Alabama \
+  --county "Autauga County" \
+  --file-name 01001C_20231225.zip
 ```
 
 ### 4. Assess and generate the public EER alternative load projections
@@ -144,9 +144,9 @@ Generate the schema-compatible public alternative CSVs with:
 
 ```bash
 python -m reVeal.public_data generate-eer-loads \
-	--workbook external-data/unpacked/eer/ADP2024_detailed_output_data.xlsx \
-	--regions tests/data/downscale/inputs/regions/eer_adp_zones.gpkg \
-	--output-dir external-data/derived/eer
+  --workbook external-data/unpacked/eer/ADP2024_detailed_output_data.xlsx \
+  --regions tests/data/downscale/inputs/regions/eer_adp_zones.gpkg \
+  --output-dir external-data/derived/eer
 ```
 
 That command writes:
@@ -166,16 +166,16 @@ Run the validated total smoke test with:
 
 ```bash
 python external-data/derived/eer/run_downscale_smoke.py \
-	external-data/derived/eer/config_public_total_smoke.json \
-	--output external-data/derived/eer/downscale-smoke/public_eer_total_downscaled.gpkg
+  external-data/derived/eer/config_public_total_smoke.json \
+  --output external-data/derived/eer/downscale-smoke/public_eer_total_downscaled.gpkg
 ```
 
 Run the validated grouped regional smoke test with:
 
 ```bash
 python external-data/derived/eer/run_downscale_smoke.py \
-	external-data/derived/eer/config_public_regional_smoke.json \
-	--output external-data/derived/eer/downscale-smoke/public_eer_regional_downscaled.gpkg
+  external-data/derived/eer/config_public_regional_smoke.json \
+  --output external-data/derived/eer/downscale-smoke/public_eer_regional_downscaled.gpkg
 ```
 
 These smoke tests confirm that the generated public EER outputs are operationally
@@ -206,19 +206,23 @@ Behavior:
 - Resume it with `--resume` and the same `--status-path`.
 - Use `--force` to discard an existing status file and start over.
 - The status JSON records completed steps and per-step outputs so you can inspect
-	what already ran.
+  what already ran.
 
 ### 7. Materialize the bounded public report bundle
 
 If you want a report-facing bundle that wraps the bounded reproduction path and
 records the current deviations from report parity, use:
 
+For the coworker-facing explanation of what is in the bundle, where it came from,
+what was added, and what is still missing, start with
+`docs/source/misc/data_center_report_bundle.rst`.
+
 ```bash
 python -m reVeal.public_data run-public-report-bundle \
   --output-dir external-data/derived/report-bundle
 ```
 
-That command reruns the bounded public reproduction workflow and writes a tracked
+That command reruns the bounded public reproduction workflow and writes a local
 bundle directory with:
 
 - `external-data/derived/report-bundle/public_report_bundle_status.json`
@@ -233,6 +237,9 @@ bundle directory with:
 - `external-data/derived/report-bundle/public_report_hosting_capacity_proxy.gpkg`
 - `external-data/derived/report-bundle/public_report_suitability_map.html`
 - `external-data/derived/report-bundle/public_report_assumption_registry.json`
+- `external-data/derived/report-bundle/public_report_grid_resolution_contract.json`
+- `external-data/derived/report-bundle/public_report_allocation_assumption_contract.json`
+- `external-data/derived/report-bundle/public_report_baxtel_schema_contract.json`
 - `external-data/derived/report-bundle/public_report_limitations.md`
 - `external-data/derived/report-bundle/public_report_reeds_integration_contract.json`
 - `external-data/derived/report-bundle/public_eer_total_downscaled_cumulative_buildout.gpkg`
@@ -270,6 +277,10 @@ Behavior:
   `public_report_census_geolookup_misses.md` so retained Census misses can be
   reviewed by nearest-state fallback, boundary/coastal class, water/wetland clamp
   status, and map-impact class.
+- When Census GeoLookup is enabled, the generated
+  `public_report_census_geography_cache.json` file is written beside the bundle
+  outputs as a resumable API cache. Treat it as a local cache, not as a manifest
+  deliverable or reviewed report product.
 - The D3 map HTML page embeds the bounded feasible-land and suitability surfaces in a single browser-rendered file so you can inspect the map without opening GIS software. The underlying grid remains the internal model, but the browser display draws grid-backed cells as fitted hexagons for quicker visual scanning. Water/wetland-flagged cells remain in the map footprint at `0` suitability percentile. Optional state-boundary, zoning-proxy, permitting / ordinance evidence, social-friction evidence, and hosting-capacity proxy layers provide bounded context overlays without replacing the base suitability surface. The map also includes a buildout mode with source, metric, and year controls for bounded cumulative smoke-output review; those controls do not imply report-equivalent temporal parity.
 - The assumption registry JSON records the current scenario inputs, report-reference
   assumptions, bounded bundle rules, output labels, and explicit assumption gaps so
@@ -313,7 +324,7 @@ use the example-workflow runner:
 
 ```bash
 python -m reVeal.public_data run-public-example-workflows \
-	--status-path external-data/derived/public_example_workflows_status.json
+  --status-path external-data/derived/public_example_workflows_status.json
 ```
 
 That command stages the tracked example bundles when needed and then runs the seven
@@ -342,7 +353,7 @@ without rerunning the analysis:
 
 ```bash
 python -m reVeal.public_data summarize-public-workflow-status \
-	--status-path external-data/derived/public_reproduction_status.json
+  --status-path external-data/derived/public_reproduction_status.json
 ```
 
 That command works with both:
@@ -403,14 +414,14 @@ functions such as:
 
 ```python
 from reVeal.public_data import (
-		download_ribits_bank_site_snapshot,
-		generate_eer_public_projection_csvs,
-		list_public_datasets,
-		run_public_example_workflows,
-		run_public_reproduction_workflow,
-		summarize_public_workflow_status,
-		stage_public_example_bundle,
-		stage_public_dataset,
+    download_ribits_bank_site_snapshot,
+    generate_eer_public_projection_csvs,
+    list_public_datasets,
+    run_public_example_workflows,
+    run_public_reproduction_workflow,
+    summarize_public_workflow_status,
+    stage_public_example_bundle,
+    stage_public_dataset,
 )
 ```
 

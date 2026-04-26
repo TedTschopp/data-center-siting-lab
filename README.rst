@@ -69,6 +69,29 @@ For more information on running ``reVeal``, see
 `Usage <https://github.com/NatLabRockies/reVeal/blob/main/usage.md>`_.
 
 
+Data Center Public Report Bundle
+================================
+This repository includes a bounded public approximation of the data center siting
+report workflow. It adds repo-local dataset manifests, public-source substitutes,
+explicit gap documentation, report-bundle generation, and an Executive Siting and
+Buildout View HTML report for coworker review.
+
+Start here if you are trying to understand what is in the solution, what is still
+missing, and how the current work differs from the original upstream package and
+source report workflow:
+
+* `Data Center Report Bundle Guide <docs/source/misc/data_center_report_bundle.rst>`_
+* `Usage Guide <usage.md>`_
+* `Report Reproduction Gaps <external-data/provenance/report-reproduction-gaps.md>`_
+* `Data Center Bundle Deviations <external-data/provenance/data-center-bundle-deviations.md>`_
+* `Publishing Checklist <PUBLISHING.md>`_
+
+The report bundle is intentionally framed as a bounded public approximation, not a
+claim of exact report parity. Generated HTML, GeoPackage, JSON, CSV, Markdown, and
+cache payloads under ``external-data/derived/report-bundle`` are local deliverables
+and are not intended to be committed.
+
+
 Development
 ===========
 Please see the `Development Guidelines <https://natlabrockies.github.io/reVeal/dev/index.html>`_

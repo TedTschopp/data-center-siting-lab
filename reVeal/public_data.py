@@ -7490,6 +7490,38 @@ def _write_public_report_suitability_map(
             color: var(--note-ink);
             line-height: 1.5;
         }}
+        .executive-summary {{
+            display: grid;
+            gap: 12px;
+        }}
+        .summary-grid {{
+            display: grid;
+            grid-template-columns: repeat(2, minmax(0, 1fr));
+            gap: 10px;
+        }}
+        .summary-item {{
+            display: grid;
+            gap: 4px;
+            min-width: 0;
+        }}
+        .summary-item.is-wide {{
+            grid-column: 1 / -1;
+        }}
+        .summary-label {{
+            font-size: 0.72rem;
+            letter-spacing: 0.08em;
+            text-transform: uppercase;
+            color: var(--muted);
+        }}
+        .summary-value {{
+            color: var(--ink);
+            font-weight: 600;
+            overflow-wrap: anywhere;
+        }}
+        .summary-value.is-muted {{
+            color: var(--muted);
+            font-weight: 500;
+        }}
         .layer-panel {{
             background: var(--layer-panel-bg);
         }}
@@ -7772,6 +7804,31 @@ def _write_public_report_suitability_map(
                     <span class=\"eyebrow\">Executive Readout</span>
                     <p class="note">Read this as a portfolio decision screen. The map highlights candidate geography, modeled buildout pressure, and contextual risk indicators in one place so leaders can align on where to investigate next, which assumptions are bounded, and what evidence is still needed before investment or policy decisions.</p>
                 </div>
+                <section class="note executive-summary" id="executive-summary-panel">
+                    <span class="eyebrow">Executive Summary</span>
+                    <div class="summary-grid">
+                        <div class="summary-item">
+                            <span class="summary-label">Decision Supported</span>
+                            <span class="summary-value">Prioritize where to investigate next.</span>
+                        </div>
+                        <div class="summary-item">
+                            <span class="summary-label">Current Lens</span>
+                            <span class="summary-value" id="summary-current-lens">Suitability screening</span>
+                        </div>
+                        <div class="summary-item is-wide">
+                            <span class="summary-label">Priority Geography</span>
+                            <span class="summary-value" id="summary-priority-geography">n/a</span>
+                        </div>
+                        <div class="summary-item is-wide">
+                            <span class="summary-label">Selected Context</span>
+                            <span class="summary-value" id="summary-selected-context">Highest current suitability score</span>
+                        </div>
+                        <div class="summary-item is-wide">
+                            <span class="summary-label">Evidence Required</span>
+                            <span class="summary-value is-muted">Confirm parcel constraints, interconnection feasibility, permitting posture, community acceptance, and report-parity data before investment-grade use.</span>
+                        </div>
+                    </div>
+                </section>
                 <section>
                     <div class=\"stat-grid\">
                         <div class=\"stat\">
@@ -7989,6 +8046,9 @@ def _write_public_report_suitability_map(
         const buildoutYearRange = d3.select("#buildout-year-range");
         const buildoutYearLabel = d3.select("#buildout-year-label");
         const legendLabel = d3.select("#legend-label");
+        const summaryCurrentLens = d3.select("#summary-current-lens");
+        const summaryPriorityGeography = d3.select("#summary-priority-geography");
+        const summarySelectedContext = d3.select("#summary-selected-context");
         const formatMw = (value) => value == null || !Number.isFinite(Number(value)) ? "n/a" : `${{d3.format(",.0f")(Number(value))}} MW`;
         const selectedBuildoutSource = () => buildoutSourceById.get(selectedBuildoutSourceId) || buildoutSources[0] || null;
         const selectedBuildoutMetric = () => buildoutMetricById.get(selectedBuildoutMetricId) || (buildoutTimelineData.metrics || [])[0] || {{ id: selectedBuildoutMetricId, shortLabel: selectedBuildoutMetricId, unit: "MW" }};
@@ -7996,6 +8056,19 @@ def _write_public_report_suitability_map(
         const selectedBuildoutFeatures = () => {{
             const source = selectedBuildoutSource();
             return (source?.geoJson?.features || []).filter((feature) => Number(feature.properties?.year) === Number(selectedBuildoutYear));
+        }};
+        const syncExecutiveSummary = () => {{
+            const topCandidate = rankedRows[0] || null;
+            summaryPriorityGeography.text(topCandidate ? displayCellName(topCandidate) : "n/a");
+            if (mapMode === "buildout") {{
+                const metric = selectedBuildoutMetric();
+                const summary = selectedBuildoutSummary();
+                summaryCurrentLens.text("Buildout pressure");
+                summarySelectedContext.text(`${{selectedBuildoutSource()?.label ?? "Buildout scenario"}} · ${{selectedBuildoutYear ?? "n/a"}} · ${{metric.shortLabel ?? metric.label}} ${{formatMw(summary?.[metric.id])}}`);
+            }} else {{
+                summaryCurrentLens.text("Suitability screening");
+                summarySelectedContext.text(topCandidate ? `Highest current score: ${{d3.format(".1f")(topCandidate.suitability_percentile ?? 0)}} percentile` : "Highest current suitability score");
+            }}
         }};
         const zoningProxyClassLabels = {{
             non_developed_context: "Non-developed context",
@@ -8815,6 +8888,7 @@ def _write_public_report_suitability_map(
                 const metric = selectedBuildoutMetric();
                 legendLabel.text(mapMode === "buildout" ? `Higher selected ${{metric.shortLabel ?? metric.label}}` : "Higher suitability percentile");
                 updateBuildoutTableMeta();
+                syncExecutiveSummary();
             }};
             const setMapMode = (nextMode) => {{
                 if (!['suitability', 'buildout'].includes(nextMode)) {{

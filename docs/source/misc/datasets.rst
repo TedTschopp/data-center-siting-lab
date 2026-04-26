@@ -179,6 +179,10 @@ restart from the beginning.
 Bounded public report bundle
 ============================
 
+For a coworker-facing explanation of what the bundle contains, where it came
+from, what was added to upstream ``reVeal``, and what remains bounded, start with
+:doc:`data_center_report_bundle`.
+
 The repo now also exposes a report-facing bundle command that wraps the bounded
 reproduction workflow and writes explicit deviation artifacts:
 

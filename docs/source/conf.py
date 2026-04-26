@@ -70,7 +70,7 @@ html_theme_options = {"navigation_depth": 4, "collapse_navigation": False}
 html_css_file = ["custom.css"]
 html_context = {
     "display_github": True,
-    "github_user": "nlr",
+    "github_user": "NatLabRockies",
     "github_repo": "reVeal",
     "github_version": "main",
     "conf_py_path": "/docs/source/",

@@ -3188,6 +3188,15 @@ def test_run_public_report_bundle_writes_manifest_and_deviation_note(tmp_path, m
     assert "Executive Siting and Buildout View" in suitability_map_html
     assert "Executive Planning Readout" in suitability_map_html
     assert "Executive Readout" in suitability_map_html
+    assert "Executive Summary" in suitability_map_html
+    assert "Decision Supported" in suitability_map_html
+    assert "Current Lens" in suitability_map_html
+    assert "Priority Geography" in suitability_map_html
+    assert "Evidence Required" in suitability_map_html
+    assert "summary-priority-geography" in suitability_map_html
+    assert "summary-current-lens" in suitability_map_html
+    assert "summary-selected-context" in suitability_map_html
+    assert "syncExecutiveSummary" in suitability_map_html
     assert "Decision Lens" in suitability_map_html
     assert "Risk Overlays" in suitability_map_html
     assert "Priority Candidates" in suitability_map_html
