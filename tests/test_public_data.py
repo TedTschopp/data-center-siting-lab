@@ -22,7 +22,10 @@ from reVeal.public_data import (
     PUBLIC_DATASET_CATALOG,
     _annotate_public_report_cell_names,
     _apply_public_report_census_miss_classification,
+    _build_public_report_allocation_assumption_contract,
+    _build_public_report_baxtel_schema_contract,
     _build_public_report_census_geolookup_miss_frame,
+    _build_public_report_grid_resolution_contract,
     _extract_public_report_census_geography_record,
     _fetch_public_report_census_geographies,
     _build_public_report_feasible_land_frame,
@@ -1072,6 +1075,182 @@ def test_build_public_report_feasible_land_frame_retains_and_clamps_nlcd_water_a
     ]
     assert feasible["water_wetland_excluded"].tolist() == [True, True, False]
     assert suitability["suitability_percentile"].tolist() == [0.0, 0.0, 83.333333]
+
+
+def test_build_public_report_grid_resolution_contract_blocks_coarse_fixture_grid(tmp_path):
+    """The current execution grid should be measured and compared to the report grid."""
+
+    grid_frame = gpd.GeoDataFrame(
+        {
+            "sc_point_gid": [101, 102],
+            "developable_capacity_mw": [100.0, 100.0],
+            "suitability_score": [0.1, 0.2],
+        },
+        geometry=[
+            box(0.0, 0.0, 46_080.0, 46_080.0),
+            box(46_080.0, 0.0, 92_160.0, 46_080.0),
+        ],
+        crs="EPSG:5070",
+    )
+
+    contract = _build_public_report_grid_resolution_contract(
+        tmp_path,
+        grid_frame=grid_frame,
+        grid_path=tmp_path / "grid.gpkg",
+    )
+
+    assert contract["contract_type"] == "report-parity-grid-resolution-contract"
+    assert contract["report_reference"] == {
+        "grid_resolution_km": 5.76,
+        "grid_cell_width_km": 5.76,
+        "grid_cell_height_km": 5.76,
+        "linkedin_aggregation_grid_resolution_km": 5.0,
+    }
+    assert contract["current_bundle"]["stable_cell_id_field"] == "sc_point_gid"
+    assert contract["current_bundle"]["cell_count"] == 2
+    assert contract["current_bundle"]["source_crs"] == "EPSG:5070"
+    assert contract["current_bundle"]["measurement_crs"] == "EPSG:5070"
+    assert contract["current_bundle"]["median_cell_width_km"] == pytest.approx(46.08)
+    assert contract["current_bundle"]["median_cell_height_km"] == pytest.approx(46.08)
+    assert contract["current_bundle"]["median_cell_area_sq_km"] == pytest.approx(
+        46.08 * 46.08
+    )
+    assert contract["current_bundle"]["coarsening_factor_vs_report_width"] == pytest.approx(8.0)
+    assert contract["current_bundle"]["estimated_report_equivalent_cells_for_current_footprint"] == 128
+    assert contract["parity_status"] == "blocked"
+    assert set(contract["parity_blockers"]) == {
+        "current_grid_resolution_mismatch",
+        "report_grid_source_not_recovered",
+        "stable_report_cell_id_scheme_missing",
+    }
+    assert "Do not subdivide" in contract["implementation_decision"]
+
+
+def test_build_public_report_allocation_assumption_contract_blocks_unrecovered_rules(
+    tmp_path,
+):
+    """Allocation assumptions should be explicit when report rules are not recovered."""
+
+    smoke_configs = [
+        (
+            "public_eer_total_downscaled",
+            tmp_path / "config_public_total_smoke.json",
+            {
+                "projection_resolution": "total",
+                "grid_priority": "suitability_score",
+                "load_projections": "national.csv",
+                "load_value": "dc_load_mw",
+                "load_year": "year",
+                "priority_power": 100,
+                "n_bootstraps": 500,
+                "random_seed": 0,
+            },
+        ),
+        (
+            "public_eer_regional_downscaled",
+            tmp_path / "config_public_regional_smoke.json",
+            {
+                "projection_resolution": "regional",
+                "grid_priority": "suitability_score",
+                "load_projections": "regional.csv",
+                "load_value": "dc_load_mw",
+                "load_year": "year",
+                "load_regions": "zone_group",
+                "region_names": "zone_group",
+                "priority_power": 100,
+                "n_bootstraps": 100,
+                "random_seed": 0,
+            },
+        ),
+    ]
+
+    contract = _build_public_report_allocation_assumption_contract(
+        tmp_path,
+        smoke_configs=smoke_configs,
+        temporal_assumptions={"parity_status": "blocked"},
+        spatial_grid_contract={"parity_status": "blocked"},
+        capacity_constraint_assumptions={"parity_status": "value-aligned"},
+    )
+
+    assert contract["contract_type"] == "report-parity-allocation-assumption-contract"
+    assert contract["report_reference"]["projection_source"] == "EER high data center regional projections through 2050"
+    assert contract["report_reference"]["allocation_surface"] == "report-equivalent suitability surface"
+    assert contract["current_bundle"]["allocation_algorithm"] == "weighted-bootstrap random shuffle over suitability-priority cells"
+    assert contract["current_bundle"]["projection_resolutions"] == ["total", "regional"]
+    assert contract["current_bundle"]["regional_projection_configured"] is True
+    assert contract["current_bundle"]["regional_group_fields"] == ["zone_group"]
+    assert contract["current_bundle"]["priority_fields"] == ["suitability_score"]
+    assert contract["current_bundle"]["priority_powers"] == [100]
+    assert contract["current_bundle"]["n_bootstraps"] == [100, 500]
+    assert contract["current_bundle"]["random_seeds"] == [0]
+    assert contract["alignment_checks"]["regional_projection_configured"] is True
+    assert contract["alignment_checks"]["exact_report_algorithm_recovered"] is False
+    assert contract["alignment_checks"]["report_suitability_surface_recovered"] is False
+    assert contract["parity_status"] == "blocked"
+    assert set(contract["parity_blockers"]) == {
+        "exact_report_allocation_algorithm_not_recovered",
+        "report_suitability_surface_not_recovered",
+        "spatial_grid_contract_blocked",
+        "temporal_contract_blocked",
+    }
+
+
+def test_build_public_report_baxtel_schema_contract_blocks_missing_schema(tmp_path):
+    """Baxtel schema parity should remain blocked until licensed schema exists."""
+
+    public_baseline_path = (
+        tmp_path / "external-data/derived/data-centers/public_data_center_baseline.csv"
+    )
+    public_baseline_path.parent.mkdir(parents=True, exist_ok=True)
+    pd.DataFrame(
+        [
+            {
+                "baseline_id": "public-1",
+                "name": "Example Data Center",
+                "operator": "Example Operator",
+                "site_status": "existing",
+                "sources": "manual",
+                "source_count": 1,
+                "source_ids": "manual:1",
+                "wikidata_id": "",
+                "source_url": "https://example.com/site",
+                "source_note": "manual test row",
+                "latitude": 39.0,
+                "longitude": -105.0,
+            }
+        ]
+    ).to_csv(public_baseline_path, index=False)
+
+    contract = _build_public_report_baxtel_schema_contract(tmp_path)
+
+    assert contract["contract_type"] == "report-parity-baxtel-schema-contract"
+    assert contract["report_reference"]["source"] == "Baxtel U.S. data center sites"
+    assert contract["report_reference"]["starting_stock_year"] == 2025
+    assert contract["current_evidence"]["baxtel_schema_available"] is False
+    assert contract["current_evidence"]["public_baseline_available"] is True
+    assert contract["schema_comparison"]["public_baseline_required_fields_present"] == [
+        "name",
+        "latitude",
+        "longitude",
+        "site_status",
+    ]
+    assert contract["schema_comparison"]["baxtel_missing_required_fields"] == [
+        "name",
+        "latitude",
+        "longitude",
+        "site_status",
+    ]
+    assert contract["alignment_checks"]["baxtel_schema_available"] is False
+    assert contract["alignment_checks"]["public_baseline_minimum_training_fields_present"] is True
+    assert contract["alignment_checks"]["trained_suitability_surface_reproducible"] is False
+    assert contract["decision"]["trained_suitability_parity_path"] == "blocked-commercial-schema-required"
+    assert contract["parity_status"] == "blocked"
+    assert set(contract["parity_blockers"]) == {
+        "baxtel_sample_or_licensed_schema_not_available",
+        "baxtel_2025_operating_baseline_not_recovered",
+        "trained_suitability_surface_not_reproducible_from_current_public_baseline",
+    }
+    assert "Do not treat" in contract["implementation_decision"]
 
 
 def test_assess_public_eer_drop_in_compatibility_marks_workbook_as_transform_only():
@@ -2552,11 +2731,34 @@ def test_run_public_report_bundle_writes_manifest_and_deviation_note(tmp_path, m
     assumption_registry_path = bundle_dir / "public_report_assumption_registry.json"
     limitations_path = bundle_dir / "public_report_limitations.md"
     reeds_contract_path = bundle_dir / "public_report_reeds_integration_contract.json"
+    grid_contract_path = bundle_dir / "public_report_grid_resolution_contract.json"
+    allocation_contract_path = bundle_dir / "public_report_allocation_assumption_contract.json"
+    baxtel_contract_path = bundle_dir / "public_report_baxtel_schema_contract.json"
     bundle_readme_path = bundle_dir / "README.md"
+    public_baseline_path = tmp_path / "external-data/derived/data-centers/public_data_center_baseline.csv"
 
     grid_path.parent.mkdir(parents=True, exist_ok=True)
     regions_path.parent.mkdir(parents=True, exist_ok=True)
     total_config_path.parent.mkdir(parents=True, exist_ok=True)
+    public_baseline_path.parent.mkdir(parents=True, exist_ok=True)
+    pd.DataFrame(
+        [
+            {
+                "baseline_id": "public-1",
+                "name": "Example Data Center",
+                "operator": "Example Operator",
+                "site_status": "existing",
+                "sources": "manual",
+                "source_count": 1,
+                "source_ids": "manual:1",
+                "wikidata_id": "",
+                "source_url": "https://example.com/site",
+                "source_note": "manual test row",
+                "latitude": 39.0,
+                "longitude": -105.0,
+            }
+        ]
+    ).to_csv(public_baseline_path, index=False)
     total_config_path.write_text(
         json.dumps(
             {
@@ -2840,6 +3042,9 @@ def test_run_public_report_bundle_writes_manifest_and_deviation_note(tmp_path, m
     assert assumption_registry_path.exists()
     assert limitations_path.exists()
     assert reeds_contract_path.exists()
+    assert grid_contract_path.exists()
+    assert allocation_contract_path.exists()
+    assert baxtel_contract_path.exists()
     assert bundle_readme_path.exists()
     assert "regenerated deliverables" in bundle_readme_path.read_text()
     assert total_cumulative_path.exists()
@@ -2867,6 +3072,9 @@ def test_run_public_report_bundle_writes_manifest_and_deviation_note(tmp_path, m
     assert assumption_registry_path.as_posix() in manifest["output_paths"]
     assert limitations_path.as_posix() in manifest["output_paths"]
     assert reeds_contract_path.as_posix() in manifest["output_paths"]
+    assert grid_contract_path.as_posix() in manifest["output_paths"]
+    assert allocation_contract_path.as_posix() in manifest["output_paths"]
+    assert baxtel_contract_path.as_posix() in manifest["output_paths"]
     assert total_cumulative_path.as_posix() in manifest["output_paths"]
     assert regional_cumulative_path.as_posix() in manifest["output_paths"]
     assert summary_path.as_posix() in manifest["output_paths"]
@@ -2889,6 +3097,45 @@ def test_run_public_report_bundle_writes_manifest_and_deviation_note(tmp_path, m
     assert capacity_assumptions["current_bundle"]["max_site_addition_per_time_step_mw"] == [1000]
     assert capacity_assumptions["current_bundle"]["max_site_addition_per_year_mw"] == []
     assert capacity_assumptions["parity_status"] == "value-aligned"
+    grid_contract = assumption_registry["spatial_grid_contract"]
+    assert grid_contract == json.loads(grid_contract_path.read_text())
+    assert grid_contract["report_reference"]["grid_resolution_km"] == 5.76
+    assert grid_contract["report_reference"]["linkedin_aggregation_grid_resolution_km"] == 5.0
+    assert grid_contract["current_bundle"]["cell_count"] == 4
+    assert grid_contract["current_bundle"]["source_crs"] == "EPSG:4326"
+    assert grid_contract["current_bundle"]["measurement_crs"] == "EPSG:5070"
+    assert grid_contract["current_bundle"]["stable_cell_id_field"] == "sc_point_gid"
+    assert grid_contract["parity_status"] == "blocked"
+    assert "current_grid_resolution_mismatch" in grid_contract["parity_blockers"]
+    allocation_contract = assumption_registry["allocation_assumption_contract"]
+    assert allocation_contract == json.loads(allocation_contract_path.read_text())
+    assert allocation_contract["current_bundle"]["projection_resolutions"] == ["total", "regional"]
+    assert allocation_contract["current_bundle"]["regional_projection_configured"] is True
+    assert allocation_contract["current_bundle"]["priority_fields"] == ["suitability_score"]
+    assert allocation_contract["current_bundle"]["priority_powers"] == [100]
+    assert allocation_contract["current_bundle"]["n_bootstraps"] == [100, 500]
+    assert allocation_contract["alignment_checks"]["regional_projection_configured"] is True
+    assert allocation_contract["alignment_checks"]["exact_report_algorithm_recovered"] is False
+    assert allocation_contract["alignment_checks"]["report_suitability_surface_recovered"] is False
+    assert allocation_contract["parity_status"] == "blocked"
+    assert "exact_report_allocation_algorithm_not_recovered" in allocation_contract[
+        "parity_blockers"
+    ]
+    assert all(
+        check["status"] == "passed"
+        for check in allocation_contract["validation_checks"]
+    )
+    baxtel_contract = assumption_registry["baxtel_schema_contract"]
+    assert baxtel_contract == json.loads(baxtel_contract_path.read_text())
+    assert baxtel_contract["current_evidence"]["baxtel_schema_available"] is False
+    assert baxtel_contract["current_evidence"]["public_baseline_available"] is True
+    assert baxtel_contract["alignment_checks"]["public_baseline_minimum_training_fields_present"] is True
+    assert baxtel_contract["alignment_checks"]["trained_suitability_surface_reproducible"] is False
+    assert baxtel_contract["decision"]["trained_suitability_parity_path"] == "blocked-commercial-schema-required"
+    assert baxtel_contract["parity_status"] == "blocked"
+    assert "baxtel_sample_or_licensed_schema_not_available" in baxtel_contract[
+        "parity_blockers"
+    ]
     temporal_assumptions = assumption_registry["temporal_assumptions"]
     assert temporal_assumptions["report_reference"] == {
         "starting_stock_year": 2025,
@@ -2932,6 +3179,9 @@ def test_run_public_report_bundle_writes_manifest_and_deviation_note(tmp_path, m
     assert "public_report_social_friction_proxy" in output_labels
     assert "public_report_zoning_proxy" in output_labels
     assert "public_report_suitability_map" in output_labels
+    assert "public_report_grid_resolution_contract" in output_labels
+    assert "public_report_allocation_assumption_contract" in output_labels
+    assert "public_report_baxtel_schema_contract" in output_labels
 
     suitability_map_html = suitability_map_path.read_text()
     assert "https://d3js.org/d3.v7.min.js" in suitability_map_html
@@ -2942,6 +3192,7 @@ def test_run_public_report_bundle_writes_manifest_and_deviation_note(tmp_path, m
     assert "permittingProxyGeoJson" in suitability_map_html
     assert "socialFrictionProxyGeoJson" in suitability_map_html
     assert "zoningProxyGeoJson" in suitability_map_html
+    assert "buildoutTimelineData" in suitability_map_html
     assert "rankedRows" in suitability_map_html
     assert "data-cell-key" in suitability_map_html
     assert "setActiveCellKey" in suitability_map_html
@@ -2963,6 +3214,26 @@ def test_run_public_report_bundle_writes_manifest_and_deviation_note(tmp_path, m
     assert "squareDisplayPath" in suitability_map_html
     assert "updateCellDisplayGeometry" in suitability_map_html
     assert "setDisplayMode" in suitability_map_html
+    assert "suitability-mode-toggle" in suitability_map_html
+    assert "buildout-mode-toggle" in suitability_map_html
+    assert "setMapMode" in suitability_map_html
+    assert "buildout-source-select" in suitability_map_html
+    assert "buildout-metric-select" in suitability_map_html
+    assert "buildout-year-range" in suitability_map_html
+    assert "buildout-year-label" in suitability_map_html
+    assert "selected-buildout-total-load" in suitability_map_html
+    assert "selected-buildout-new-load" in suitability_map_html
+    assert "selected-buildout-capacity" in suitability_map_html
+    assert "renderBuildoutLayer" in suitability_map_html
+    assert "syncBuildoutTimelineControls" in suitability_map_html
+    assert "buildout-cell" in suitability_map_html
+    assert "buildout-cell-meta" in suitability_map_html
+    assert "cumulative_total_dc_load_mw" in suitability_map_html
+    assert "cumulative_new_dc_load_mw" in suitability_map_html
+    assert "cumulative_total_dc_capacity_mw" in suitability_map_html
+    assert "Selected year:" in suitability_map_html
+    assert "Buildout source:" in suitability_map_html
+    assert "public_eer_total_downscaled" in suitability_map_html
     assert "hex-state-boundary" in suitability_map_html
     assert "buildHexStateBoundarySegments" in suitability_map_html
     assert "assignStateCodeForFeature" in suitability_map_html
@@ -3020,6 +3291,27 @@ def test_run_public_report_bundle_writes_manifest_and_deviation_note(tmp_path, m
     )
     assert utilization_gap["status"] == "configured-in-current-bundle"
     assert "report_reference_per_site_capacity_constraint" in gap_names
+    grid_gap = next(
+        item
+        for item in assumption_registry["assumption_gaps"]
+        if item["name"] == "report_reference_grid_resolution_km"
+    )
+    assert grid_gap["status"] == "blocked"
+    assert grid_gap["parity_blockers"] == grid_contract["parity_blockers"]
+    allocation_gap = next(
+        item
+        for item in assumption_registry["assumption_gaps"]
+        if item["name"] == "report_reference_allocation_assumptions"
+    )
+    assert allocation_gap["status"] == "blocked"
+    assert allocation_gap["parity_blockers"] == allocation_contract["parity_blockers"]
+    baxtel_gap = next(
+        item
+        for item in assumption_registry["assumption_gaps"]
+        if item["name"] == "report_reference_baxtel_schema_and_trained_suitability"
+    )
+    assert baxtel_gap["status"] == "blocked"
+    assert baxtel_gap["parity_blockers"] == baxtel_contract["parity_blockers"]
     assert "report_reference_initial_locations" in gap_names
     limitation_names = {item["name"] for item in assumption_registry["limitation_carry_forward"]}
     assert "local_transmission_hosting_capacity" in limitation_names
@@ -3075,6 +3367,22 @@ def test_run_public_report_bundle_writes_manifest_and_deviation_note(tmp_path, m
     assert reeds_contract["capacity_constraint_contract"]["per_site_time_step_capacity_validation_status"] == "passed"
     assert reeds_contract["spatial_contract"]["grid_cell_key"] == "sc_point_gid"
     assert reeds_contract["spatial_contract"]["report_reference_grid_resolution_km"] == 5.76
+    assert reeds_contract["spatial_contract"]["linkedin_aggregation_grid_resolution_km"] == 5.0
+    assert reeds_contract["spatial_contract"]["current_bundle_grid_resolution_km"] == grid_contract[
+        "current_bundle"
+    ]["median_equivalent_square_resolution_km"]
+    assert reeds_contract["spatial_contract"]["spatial_parity_status"] == "blocked"
+    assert reeds_contract["spatial_contract"]["grid_resolution_contract_path"] == grid_contract_path.as_posix()
+    assert reeds_contract["allocation_contract"]["allocation_parity_status"] == "blocked"
+    assert reeds_contract["allocation_contract"]["allocation_contract_path"] == allocation_contract_path.as_posix()
+    assert reeds_contract["allocation_contract"]["current_bundle_allocation_algorithm"] == allocation_contract[
+        "current_bundle"
+    ]["allocation_algorithm"]
+    assert reeds_contract["baxtel_schema_contract"]["baxtel_schema_parity_status"] == "blocked"
+    assert reeds_contract["baxtel_schema_contract"]["baxtel_schema_contract_path"] == baxtel_contract_path.as_posix()
+    assert reeds_contract["baxtel_schema_contract"]["trained_suitability_parity_path"] == baxtel_contract[
+        "decision"
+    ]["trained_suitability_parity_path"]
     handoff_labels = {item["label"] for item in reeds_contract["handoff_products"]}
     assert "public_eer_total_downscaled_cumulative_buildout" in handoff_labels
     assert "public_eer_regional_downscaled_cumulative_buildout" in handoff_labels

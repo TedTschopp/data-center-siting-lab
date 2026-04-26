@@ -54,7 +54,23 @@ PUBLIC_REPORT_REFERENCE_BUILDOUT_HORIZON_YEARS = (
 )
 PUBLIC_REPORT_BUNDLE_TOTAL_CONFIG_PATH = "external-data/derived/eer/config_public_total_smoke.json"
 PUBLIC_REPORT_BUNDLE_REGIONAL_CONFIG_PATH = "external-data/derived/eer/config_public_regional_smoke.json"
+PUBLIC_REPORT_BAXTEL_SCHEMA_PATH = "external-data/raw/data-centers/baxtel_data_center_sites.csv"
+PUBLIC_REPORT_PUBLIC_DATA_CENTER_BASELINE_PATH = "external-data/derived/data-centers/public_data_center_baseline.csv"
+PUBLIC_REPORT_BAXTEL_REQUIRED_TRAINING_FIELDS = (
+    "name",
+    "latitude",
+    "longitude",
+    "site_status",
+)
+PUBLIC_REPORT_BAXTEL_DESIRED_CONTEXT_FIELDS = (
+    "operator",
+    "source_url",
+    "source_note",
+)
 PUBLIC_REPORT_REFERENCE_GRID_RESOLUTION_KM = 5.76
+PUBLIC_REPORT_LINKEDIN_AGGREGATION_GRID_RESOLUTION_KM = 5.0
+PUBLIC_REPORT_GRID_MEASUREMENT_CRS = "EPSG:5070"
+PUBLIC_REPORT_GRID_RESOLUTION_TOLERANCE_KM = 0.1
 PUBLIC_REPORT_REFERENCE_UTILIZATION_FACTOR = 0.88
 PUBLIC_REPORT_REFERENCE_MAX_SITE_ADDITION_PER_TIME_STEP_MW = 1000
 PUBLIC_REPORT_REFERENCE_INITIAL_LOCATIONS = "Baxtel 2025 operating data centers"
@@ -4033,8 +4049,10 @@ def _write_public_report_bundle_readme(output_dir):
                 "- provenance notes under `external-data/provenance/`",
                 "- user-facing usage and dataset documentation",
                 "",
-                "Regenerate the local bundle whenever you need the HTML map, GeoPackages, manifest,",
-                "status JSON, deviation note, ranked CSV, cumulative buildout surfaces, or cached",
+                "Regenerate the local bundle whenever you need the HTML map with buildout timeline",
+                "controls, GeoPackages, manifest,",
+                "status JSON, deviation note, ranked CSV, grid-resolution contract, allocation-assumption contract, Baxtel schema contract,",
+                "cumulative buildout surfaces, or cached",
                 "state-boundary source ZIP. The default run also writes Census GeoLookup miss review",
                 "artifacts and a generated",
                 "`public_report_census_geography_cache.json` file for Census coordinate GeoLookup",
@@ -4082,6 +4100,10 @@ def _report_bundle_deviation_lines(repo_root):
             "- The current suitability-percentile artifact ranks the pre-existing `suitability_score` field on "
             "developable cells, then clamps water/wetland-excluded cells to 0 percentile rather than using a trained nationwide model surface."
         ),
+        (
+            "- The HTML map's buildout timeline mode visualizes bounded cumulative smoke-output artifacts by "
+            "source, metric, and year; it is not a report-equivalent 2025-to-2050 buildout animation."
+        ),
         "- The current workflow validates downscaling mechanics and schema compatibility, not parity of learned weights or parity of nationwide siting predictions.",
     ]
 
@@ -4091,6 +4113,123 @@ def _load_public_report_bundle_grid(repo_root):
     repo_root = Path(repo_root).resolve()
     grid_path = repo_root / PUBLIC_REPORT_BUNDLE_GRID_PATH
     return gpd.read_file(grid_path), grid_path
+
+
+def _public_report_float(value, digits=6):
+    if value is None or pd.isna(value):
+        return None
+    rounded = round(float(value), digits)
+    return int(rounded) if float(rounded).is_integer() else rounded
+
+
+def _build_public_report_grid_resolution_contract(repo_root, grid_frame=None, grid_path=None):
+    """Measure the current execution grid and compare it with the report grid contract."""
+    repo_root = Path(repo_root).resolve()
+    if grid_frame is None:
+        grid_frame, grid_path = _load_public_report_bundle_grid(repo_root)
+    elif grid_path is None:
+        grid_path = repo_root / PUBLIC_REPORT_BUNDLE_GRID_PATH
+    else:
+        grid_path = Path(grid_path)
+
+    if grid_frame.empty:
+        raise ValueError("Grid-resolution contract requires at least one grid cell")
+
+    source_crs = str(grid_frame.crs) if grid_frame.crs is not None else None
+    measurement_frame = grid_frame
+    measurement_crs = source_crs
+    if grid_frame.crs is not None:
+        measurement_frame = grid_frame.to_crs(PUBLIC_REPORT_GRID_MEASUREMENT_CRS)
+        measurement_crs = PUBLIC_REPORT_GRID_MEASUREMENT_CRS
+
+    bounds = measurement_frame.geometry.bounds
+    widths_km = (bounds.maxx - bounds.minx) / 1000.0
+    heights_km = (bounds.maxy - bounds.miny) / 1000.0
+    areas_sq_km = measurement_frame.geometry.area / 1_000_000.0
+    target_resolution = PUBLIC_REPORT_REFERENCE_GRID_RESOLUTION_KM
+    median_width_km = float(widths_km.median())
+    median_height_km = float(heights_km.median())
+    median_area_sq_km = float(areas_sq_km.median())
+    median_equivalent_square_resolution_km = float(np.sqrt(median_area_sq_km))
+    width_factor = median_width_km / target_resolution
+    height_factor = median_height_km / target_resolution
+    resolution_matches = (
+        abs(median_width_km - target_resolution) <= PUBLIC_REPORT_GRID_RESOLUTION_TOLERANCE_KM
+        and abs(median_height_km - target_resolution)
+        <= PUBLIC_REPORT_GRID_RESOLUTION_TOLERANCE_KM
+    )
+    shape_is_square = (
+        abs(median_width_km - median_height_km)
+        <= PUBLIC_REPORT_GRID_RESOLUTION_TOLERANCE_KM
+    )
+    parity_blockers = [
+        "report_grid_source_not_recovered",
+        "stable_report_cell_id_scheme_missing",
+    ]
+    if not resolution_matches:
+        parity_blockers.insert(0, "current_grid_resolution_mismatch")
+    if not shape_is_square:
+        parity_blockers.append("current_grid_cell_shape_mismatch")
+
+    cell_count = int(len(grid_frame))
+    coarsening_factor = max(width_factor, height_factor)
+    return {
+        "contract_type": "report-parity-grid-resolution-contract",
+        "report_reference": {
+            "grid_resolution_km": PUBLIC_REPORT_REFERENCE_GRID_RESOLUTION_KM,
+            "grid_cell_width_km": PUBLIC_REPORT_REFERENCE_GRID_RESOLUTION_KM,
+            "grid_cell_height_km": PUBLIC_REPORT_REFERENCE_GRID_RESOLUTION_KM,
+            "linkedin_aggregation_grid_resolution_km": PUBLIC_REPORT_LINKEDIN_AGGREGATION_GRID_RESOLUTION_KM,
+        },
+        "current_bundle": {
+            "grid_path": Path(grid_path).as_posix(),
+            "source_crs": source_crs,
+            "measurement_crs": measurement_crs,
+            "geometry_types": sorted(grid_frame.geometry.geom_type.dropna().unique().tolist()),
+            "stable_cell_id_field": _public_report_cell_key_column(grid_frame),
+            "cell_count": cell_count,
+            "median_cell_width_km": _public_report_float(median_width_km),
+            "median_cell_height_km": _public_report_float(median_height_km),
+            "median_cell_area_sq_km": _public_report_float(median_area_sq_km),
+            "median_equivalent_square_resolution_km": _public_report_float(
+                median_equivalent_square_resolution_km
+            ),
+            "min_cell_width_km": _public_report_float(widths_km.min()),
+            "max_cell_width_km": _public_report_float(widths_km.max()),
+            "min_cell_height_km": _public_report_float(heights_km.min()),
+            "max_cell_height_km": _public_report_float(heights_km.max()),
+            "coarsening_factor_vs_report_width": _public_report_float(width_factor),
+            "coarsening_factor_vs_report_height": _public_report_float(height_factor),
+            "estimated_report_equivalent_cells_for_current_footprint": int(
+                round(cell_count * coarsening_factor * coarsening_factor)
+            ),
+        },
+        "target_grid_contract": {
+            "required_resolution_km": PUBLIC_REPORT_REFERENCE_GRID_RESOLUTION_KM,
+            "required_grid_description": "unified national 5.76 km by 5.76 km grid from the report methodology",
+            "linked_output_aggregation_resolution_km": PUBLIC_REPORT_LINKEDIN_AGGREGATION_GRID_RESOLUTION_KM,
+            "required_cell_id_rule": "stable deterministic cell IDs for the recovered report-equivalent national grid",
+            "generation_status": "not-generated-current-bundle",
+        },
+        "parity_status": "value-aligned" if not parity_blockers else "blocked",
+        "parity_blockers": parity_blockers,
+        "implementation_decision": (
+            "Do not subdivide the current execution grid to 5.76 km because that would invent "
+            "unvalidated suitability, capacity, and exclusion data. Preserve current stable cell IDs "
+            "and treat the report-equivalent national grid as a required parity input until the source "
+            "grid or generation rule is recovered."
+        ),
+    }
+
+
+def _write_public_report_grid_resolution_contract(repo_root, output_dir):
+    """Write the machine-readable grid-resolution contract for the bounded bundle."""
+    output_dir = Path(output_dir)
+    output_dir.mkdir(parents=True, exist_ok=True)
+    contract_path = output_dir / "public_report_grid_resolution_contract.json"
+    contract = _build_public_report_grid_resolution_contract(repo_root)
+    contract_path.write_text(json.dumps(contract, indent=2))
+    return contract_path
 
 
 def _coerce_public_report_bool(value):
@@ -5648,6 +5787,21 @@ def _build_public_report_output_labels(output_dir):
             "description": "machine-readable handoff contract for ReEDS-facing use of the bounded public report bundle",
         },
         {
+            "label": "public_report_grid_resolution_contract",
+            "path": (output_dir / "public_report_grid_resolution_contract.json").as_posix(),
+            "description": "machine-readable comparison between the current execution grid and the report-reference national grid contract",
+        },
+        {
+            "label": "public_report_allocation_assumption_contract",
+            "path": (output_dir / "public_report_allocation_assumption_contract.json").as_posix(),
+            "description": "machine-readable comparison between current bounded allocation mechanics and unrecovered report allocation assumptions",
+        },
+        {
+            "label": "public_report_baxtel_schema_contract",
+            "path": (output_dir / "public_report_baxtel_schema_contract.json").as_posix(),
+            "description": "machine-readable comparison between Baxtel schema evidence, the public data-center baseline, and trained-suitability parity requirements",
+        },
+        {
             "label": "public_eer_total_downscaled_cumulative_buildout",
             "path": (output_dir / "public_eer_total_downscaled_cumulative_buildout.gpkg").as_posix(),
             "description": "bounded cumulative buildout approximation derived from the total smoke output",
@@ -5781,6 +5935,335 @@ def _build_public_report_capacity_constraint_assumptions(smoke_configs):
     }
 
 
+def _read_public_report_csv_columns(path):
+    path = Path(path)
+    if not path.exists():
+        return []
+    try:
+        return [str(column) for column in pd.read_csv(path, nrows=0).columns]
+    except pd.errors.EmptyDataError:
+        return []
+
+
+def _public_report_schema_present_fields(columns, expected_fields):
+    normalized_columns = {str(column).strip().lower() for column in columns}
+    return [field for field in expected_fields if field.lower() in normalized_columns]
+
+
+def _public_report_schema_missing_fields(columns, expected_fields):
+    present_fields = set(_public_report_schema_present_fields(columns, expected_fields))
+    return [field for field in expected_fields if field not in present_fields]
+
+
+def _build_public_report_baxtel_schema_contract(
+    repo_root,
+    baxtel_schema_path=None,
+    public_baseline_path=None,
+):
+    """Build the Baxtel schema and trained-suitability parity contract."""
+    repo_root = Path(repo_root).resolve()
+    baxtel_spec = PUBLIC_DATASET_CATALOG["baxtel_us_data_center_sites"]
+    baxtel_schema_path = Path(
+        baxtel_schema_path or repo_root / PUBLIC_REPORT_BAXTEL_SCHEMA_PATH
+    )
+    public_baseline_path = Path(
+        public_baseline_path or repo_root / PUBLIC_REPORT_PUBLIC_DATA_CENTER_BASELINE_PATH
+    )
+    procurement_note_path = repo_root / baxtel_spec.output_relpath
+    baxtel_columns = _read_public_report_csv_columns(baxtel_schema_path)
+    public_baseline_columns = (
+        _read_public_report_csv_columns(public_baseline_path)
+        if public_baseline_path.exists()
+        else list(DATA_CENTER_BASELINE_COLUMNS)
+    )
+    baxtel_schema_available = baxtel_schema_path.exists() and bool(baxtel_columns)
+    public_baseline_available = public_baseline_path.exists()
+    baxtel_missing_required_fields = _public_report_schema_missing_fields(
+        baxtel_columns,
+        PUBLIC_REPORT_BAXTEL_REQUIRED_TRAINING_FIELDS,
+    )
+    public_baseline_missing_required_fields = _public_report_schema_missing_fields(
+        public_baseline_columns,
+        PUBLIC_REPORT_BAXTEL_REQUIRED_TRAINING_FIELDS,
+    )
+    baxtel_required_fields_present = (
+        baxtel_schema_available and not baxtel_missing_required_fields
+    )
+    public_baseline_required_fields_present = not public_baseline_missing_required_fields
+    trained_suitability_surface_reproducible = False
+    baxtel_2025_operating_baseline_recovered = False
+    if not baxtel_schema_available:
+        trained_suitability_parity_path = "blocked-commercial-schema-required"
+    elif not baxtel_required_fields_present:
+        trained_suitability_parity_path = "blocked-schema-incomplete"
+    else:
+        trained_suitability_parity_path = "schema-evidence-available-training-workflow-required"
+
+    parity_blockers = []
+    if not baxtel_schema_available:
+        parity_blockers.append("baxtel_sample_or_licensed_schema_not_available")
+    elif not baxtel_required_fields_present:
+        parity_blockers.append("baxtel_required_training_fields_missing")
+    if not baxtel_2025_operating_baseline_recovered:
+        parity_blockers.append("baxtel_2025_operating_baseline_not_recovered")
+    if not trained_suitability_surface_reproducible:
+        parity_blockers.append(
+            "trained_suitability_surface_not_reproducible_from_current_public_baseline"
+        )
+
+    return {
+        "contract_type": "report-parity-baxtel-schema-contract",
+        "report_reference": {
+            "source": "Baxtel U.S. data center sites",
+            "source_role": "2025 operating data center starting stock and positive labels for trained suitability",
+            "starting_stock_year": PUBLIC_REPORT_BUNDLE_REPORT_BASELINE_YEAR,
+            "trained_surface": "Baxtel-trained report-equivalent suitability surface",
+            "minimum_training_fields": list(PUBLIC_REPORT_BAXTEL_REQUIRED_TRAINING_FIELDS),
+            "desired_context_fields": list(PUBLIC_REPORT_BAXTEL_DESIRED_CONTEXT_FIELDS),
+        },
+        "vendor_procurement": {
+            "dataset_id": baxtel_spec.dataset_id,
+            "acquisition_mode": baxtel_spec.acquisition_mode,
+            "landing_page": baxtel_spec.landing_page,
+            "access_urls": list(baxtel_spec.access_urls),
+            "sample_request_note_path": procurement_note_path.as_posix(),
+            "expected_local_schema_path": baxtel_schema_path.as_posix(),
+        },
+        "current_evidence": {
+            "baxtel_schema_path": baxtel_schema_path.as_posix(),
+            "baxtel_schema_available": baxtel_schema_available,
+            "baxtel_columns": baxtel_columns,
+            "public_baseline_path": public_baseline_path.as_posix(),
+            "public_baseline_available": public_baseline_available,
+            "public_baseline_schema_source": "derived-csv"
+            if public_baseline_available
+            else "code-defined-columns",
+            "public_baseline_columns": public_baseline_columns,
+        },
+        "schema_comparison": {
+            "baxtel_required_fields_present": _public_report_schema_present_fields(
+                baxtel_columns,
+                PUBLIC_REPORT_BAXTEL_REQUIRED_TRAINING_FIELDS,
+            ),
+            "baxtel_missing_required_fields": baxtel_missing_required_fields,
+            "public_baseline_required_fields_present": _public_report_schema_present_fields(
+                public_baseline_columns,
+                PUBLIC_REPORT_BAXTEL_REQUIRED_TRAINING_FIELDS,
+            ),
+            "public_baseline_missing_required_fields": public_baseline_missing_required_fields,
+        },
+        "alignment_checks": {
+            "baxtel_schema_available": baxtel_schema_available,
+            "baxtel_minimum_training_fields_present": baxtel_required_fields_present,
+            "public_baseline_minimum_training_fields_present": public_baseline_required_fields_present,
+            "baxtel_2025_operating_baseline_recovered": baxtel_2025_operating_baseline_recovered,
+            "trained_suitability_surface_reproducible": trained_suitability_surface_reproducible,
+        },
+        "decision": {
+            "trained_suitability_parity_path": trained_suitability_parity_path,
+            "current_bundle_path": "bounded-public-baseline-only",
+            "next_step": (
+                "Place a Baxtel sample or licensed CSV at the expected local schema path, keep it out "
+                "of git, rerun the report bundle, and use the schema comparison to decide whether a "
+                "licensed report-aligned training workflow is feasible."
+            ),
+        },
+        "parity_status": "value-aligned" if not parity_blockers else "blocked",
+        "parity_blockers": parity_blockers,
+        "implementation_decision": (
+            "Do not treat the public OSM/Wikidata/manual baseline or the current suitability_score "
+            "field as a Baxtel-trained report-equivalent suitability surface. Keep trained-suitability "
+            "parity blocked until the Baxtel schema, 2025 operating baseline, and model-training workflow "
+            "are recovered and validated."
+        ),
+    }
+
+
+def _write_public_report_baxtel_schema_contract(repo_root, output_dir):
+    """Write the machine-readable Baxtel schema contract for the bounded bundle."""
+    output_dir = Path(output_dir)
+    output_dir.mkdir(parents=True, exist_ok=True)
+    contract_path = output_dir / "public_report_baxtel_schema_contract.json"
+    contract = _build_public_report_baxtel_schema_contract(repo_root)
+    contract_path.write_text(json.dumps(contract, indent=2))
+    return contract_path
+
+
+def _build_public_report_allocation_validation_checks(output_dir, regional_projection_configured):
+    checks = [
+        {
+            "name": "regional_projection_configured",
+            "status": "passed" if regional_projection_configured else "failed",
+            "detail": "The bounded bundle includes a grouped regional EER projection allocation path.",
+        }
+    ]
+    if output_dir is None:
+        return checks
+
+    output_dir = Path(output_dir)
+    required_outputs = {
+        "total_cumulative_buildout_output_exists": output_dir
+        / "public_eer_total_downscaled_cumulative_buildout.gpkg",
+        "regional_cumulative_buildout_output_exists": output_dir
+        / "public_eer_regional_downscaled_cumulative_buildout.gpkg",
+        "cumulative_buildout_summary_exists": output_dir
+        / "public_report_bundle_cumulative_buildout_summary.csv",
+    }
+    for name, path in required_outputs.items():
+        checks.append(
+            {
+                "name": name,
+                "status": "passed" if path.exists() else "failed",
+                "path": path.as_posix(),
+            }
+        )
+    return checks
+
+
+def _build_public_report_allocation_assumption_contract(
+    repo_root,
+    output_dir=None,
+    smoke_configs=None,
+    temporal_assumptions=None,
+    spatial_grid_contract=None,
+    capacity_constraint_assumptions=None,
+):
+    """Build the report-parity allocation assumption contract for the bounded bundle."""
+    repo_root = Path(repo_root).resolve()
+    smoke_configs = smoke_configs or _load_public_report_bundle_smoke_configs(repo_root)
+    temporal_assumptions = temporal_assumptions or _build_public_report_temporal_assumptions(
+        repo_root,
+        output_dir or repo_root,
+        smoke_configs=smoke_configs,
+    )
+    spatial_grid_contract = spatial_grid_contract or _build_public_report_grid_resolution_contract(
+        repo_root
+    )
+    capacity_constraint_assumptions = (
+        capacity_constraint_assumptions
+        or _build_public_report_capacity_constraint_assumptions(smoke_configs)
+    )
+    projection_resolutions = [
+        str(config.get("projection_resolution"))
+        for _, _, config in smoke_configs
+        if config.get("projection_resolution")
+    ]
+    regional_projection_configured = "regional" in {
+        resolution.lower() for resolution in projection_resolutions
+    }
+    regional_group_fields = sorted(
+        {
+            str(config.get(field))
+            for _, _, config in smoke_configs
+            for field in ("load_regions", "region_names")
+            if config.get(field)
+        }
+    )
+    priority_fields = sorted(
+        {
+            str(config.get("grid_priority"))
+            for _, _, config in smoke_configs
+            if config.get("grid_priority")
+        }
+    )
+    current_bundle = {
+        "allocation_algorithm": "weighted-bootstrap random shuffle over suitability-priority cells",
+        "allocation_surface": "current execution-grid suitability_score field",
+        "projection_resolutions": projection_resolutions,
+        "regional_projection_configured": regional_projection_configured,
+        "regional_group_fields": regional_group_fields,
+        "priority_fields": priority_fields,
+        "priority_powers": _sorted_unique_public_report_numbers(
+            config.get("priority_power") for _, _, config in smoke_configs
+        ),
+        "n_bootstraps": _sorted_unique_public_report_numbers(
+            config.get("n_bootstraps") for _, _, config in smoke_configs
+        ),
+        "random_seeds": _sorted_unique_public_report_numbers(
+            config.get("random_seed") for _, _, config in smoke_configs
+        ),
+        "load_value_fields": sorted(
+            {
+                str(config.get("load_value"))
+                for _, _, config in smoke_configs
+                if config.get("load_value")
+            }
+        ),
+        "load_year_fields": sorted(
+            {
+                str(config.get("load_year"))
+                for _, _, config in smoke_configs
+                if config.get("load_year")
+            }
+        ),
+        "cumulative_output_rule": "sum new_dc_load_mw by stable cell over modeled years and reconcile cumulative_total_dc_load_mw to total_dc_load_mw",
+    }
+    alignment_checks = {
+        "regional_projection_configured": regional_projection_configured,
+        "capacity_constraint_value_aligned": capacity_constraint_assumptions.get(
+            "parity_status"
+        )
+        == "value-aligned",
+        "spatial_grid_value_aligned": spatial_grid_contract.get("parity_status")
+        == "value-aligned",
+        "temporal_assumptions_value_aligned": temporal_assumptions.get("parity_status")
+        == "value-aligned",
+        "exact_report_algorithm_recovered": False,
+        "report_suitability_surface_recovered": False,
+    }
+    blockers = []
+    if not alignment_checks["regional_projection_configured"]:
+        blockers.append("regional_projection_not_configured")
+    if not alignment_checks["capacity_constraint_value_aligned"]:
+        blockers.append("capacity_constraint_contract_blocked")
+    if not alignment_checks["spatial_grid_value_aligned"]:
+        blockers.append("spatial_grid_contract_blocked")
+    if not alignment_checks["temporal_assumptions_value_aligned"]:
+        blockers.append("temporal_contract_blocked")
+    if not alignment_checks["exact_report_algorithm_recovered"]:
+        blockers.insert(0, "exact_report_allocation_algorithm_not_recovered")
+    if not alignment_checks["report_suitability_surface_recovered"]:
+        blockers.insert(1, "report_suitability_surface_not_recovered")
+
+    return {
+        "contract_type": "report-parity-allocation-assumption-contract",
+        "report_reference": {
+            "projection_source": "EER high data center regional projections through 2050",
+            "allocation_surface": "report-equivalent suitability surface",
+            "allocation_mode": "methodically distribute regional EER projections to the suitability surface",
+            "starting_stock_year": PUBLIC_REPORT_BUNDLE_REPORT_BASELINE_YEAR,
+            "buildout_horizon_years": PUBLIC_REPORT_REFERENCE_BUILDOUT_HORIZON_YEARS,
+            "capacity_constraints": {
+                "utilization_factor": PUBLIC_REPORT_REFERENCE_UTILIZATION_FACTOR,
+                "max_site_addition_per_time_step_mw": PUBLIC_REPORT_REFERENCE_MAX_SITE_ADDITION_PER_TIME_STEP_MW,
+            },
+        },
+        "current_bundle": current_bundle,
+        "alignment_checks": alignment_checks,
+        "validation_checks": _build_public_report_allocation_validation_checks(
+            output_dir,
+            regional_projection_configured,
+        ),
+        "parity_status": "value-aligned" if not blockers else "blocked",
+        "parity_blockers": blockers,
+        "implementation_decision": (
+            "Encode the current weighted-bootstrap allocation as a bounded approximation. "
+            "Do not claim report-equivalent allocation until the exact report algorithm, "
+            "report suitability surface, temporal contract, and spatial grid contract are recovered."
+        ),
+    }
+
+
+def _write_public_report_allocation_assumption_contract(repo_root, output_dir):
+    """Write the machine-readable allocation-assumption contract for the bounded bundle."""
+    output_dir = Path(output_dir)
+    output_dir.mkdir(parents=True, exist_ok=True)
+    contract_path = output_dir / "public_report_allocation_assumption_contract.json"
+    contract = _build_public_report_allocation_assumption_contract(repo_root, output_dir=output_dir)
+    contract_path.write_text(json.dumps(contract, indent=2))
+    return contract_path
+
+
 def _build_public_report_temporal_assumptions(repo_root, output_dir, smoke_configs=None):
     """Build the report-parity temporal assumption contract for the bounded bundle."""
     repo_root = Path(repo_root).resolve()
@@ -5887,6 +6370,16 @@ def _build_public_report_assumption_registry(repo_root, output_dir):
     capacity_constraint_assumptions = _build_public_report_capacity_constraint_assumptions(
         smoke_configs
     )
+    spatial_grid_contract = _build_public_report_grid_resolution_contract(repo_root)
+    allocation_assumption_contract = _build_public_report_allocation_assumption_contract(
+        repo_root,
+        output_dir=output_dir,
+        smoke_configs=smoke_configs,
+        temporal_assumptions=temporal_assumptions,
+        spatial_grid_contract=spatial_grid_contract,
+        capacity_constraint_assumptions=capacity_constraint_assumptions,
+    )
+    baxtel_schema_contract = _build_public_report_baxtel_schema_contract(repo_root)
     return {
         "registry_type": "bounded-public-report-assumption-registry",
         "bundle_label": "bounded-public-report-bundle",
@@ -5919,6 +6412,9 @@ def _build_public_report_assumption_registry(repo_root, output_dir):
         ],
         "temporal_assumptions": temporal_assumptions,
         "capacity_constraint_assumptions": capacity_constraint_assumptions,
+        "spatial_grid_contract": spatial_grid_contract,
+        "allocation_assumption_contract": allocation_assumption_contract,
+        "baxtel_schema_contract": baxtel_schema_contract,
         "output_labels": output_labels,
         "limitation_carry_forward": [dict(entry) for entry in PUBLIC_REPORT_LIMITATION_ENTRIES],
         "assumption_gaps": [
@@ -5958,8 +6454,24 @@ def _build_public_report_assumption_registry(repo_root, output_dir):
             {
                 "name": "report_reference_grid_resolution_km",
                 "report_reference_value": PUBLIC_REPORT_REFERENCE_GRID_RESOLUTION_KM,
-                "current_bundle_value": (repo_root / PUBLIC_REPORT_BUNDLE_GRID_PATH).as_posix(),
-                "status": "fixture-grid-approximation",
+                "current_bundle_value": spatial_grid_contract["current_bundle"],
+                "status": spatial_grid_contract["parity_status"],
+                "parity_blockers": spatial_grid_contract["parity_blockers"],
+            },
+            {
+                "name": "report_reference_allocation_assumptions",
+                "report_reference_value": allocation_assumption_contract["report_reference"],
+                "current_bundle_value": allocation_assumption_contract["current_bundle"],
+                "status": allocation_assumption_contract["parity_status"],
+                "parity_blockers": allocation_assumption_contract["parity_blockers"],
+            },
+            {
+                "name": "report_reference_baxtel_schema_and_trained_suitability",
+                "report_reference_value": baxtel_schema_contract["report_reference"],
+                "current_bundle_value": baxtel_schema_contract["current_evidence"],
+                "status": baxtel_schema_contract["parity_status"],
+                "parity_blockers": baxtel_schema_contract["parity_blockers"],
+                "decision": baxtel_schema_contract["decision"],
             },
         ],
     }
@@ -6613,6 +7125,114 @@ def _build_public_report_suitability_map_rows(frame, limit=12):
     return safe.to_dict(orient="records")
 
 
+def _public_report_json_records(frame):
+    """Return JSON-safe records from a pandas frame."""
+    if frame.empty:
+        return []
+    return json.loads(frame.to_json(orient="records"))
+
+
+def _build_public_report_buildout_timeline_payload(output_dir):
+    """Build the embedded year-by-year cumulative buildout payload for the HTML map."""
+    output_dir = Path(output_dir)
+    source_specs = [
+        {
+            "id": "total",
+            "label": "Total EER buildout",
+            "output_name": "public_eer_total_downscaled",
+            "path": output_dir / "public_eer_total_downscaled_cumulative_buildout.gpkg",
+        },
+        {
+            "id": "regional",
+            "label": "Grouped regional EER buildout",
+            "output_name": "public_eer_regional_downscaled",
+            "path": output_dir / "public_eer_regional_downscaled_cumulative_buildout.gpkg",
+        },
+    ]
+    buildout_columns = [
+        "sc_point_gid",
+        "gid",
+        "year",
+        "zone_group",
+        "baseline_total_dc_load_mw",
+        "cumulative_new_dc_load_mw",
+        "cumulative_total_dc_load_mw",
+        "new_dc_capacity_mw",
+        "baseline_total_dc_capacity_mw",
+        "cumulative_new_dc_capacity_mw",
+        "cumulative_total_dc_capacity_mw",
+        "utilization_factor",
+        "max_site_addition_per_time_step_mw",
+        "per_site_time_step_capacity_limit_exceeded",
+        "geometry",
+    ]
+    sources = []
+    for spec in source_specs:
+        if not spec["path"].exists():
+            continue
+        buildout_frame = gpd.read_file(spec["path"])
+        if "year" not in buildout_frame.columns:
+            continue
+        selected_columns = [
+            column for column in buildout_columns if column in buildout_frame.columns
+        ]
+        buildout_frame = buildout_frame[selected_columns].copy()
+        years = sorted(int(year) for year in buildout_frame["year"].dropna().unique())
+        sources.append(
+            {
+                "id": spec["id"],
+                "label": spec["label"],
+                "outputName": spec["output_name"],
+                "path": spec["path"].as_posix(),
+                "years": years,
+                "geoJson": json.loads(buildout_frame.to_json()),
+            }
+        )
+
+    summary_path = output_dir / "public_report_bundle_cumulative_buildout_summary.csv"
+    summary_rows = []
+    if summary_path.exists():
+        summary = pd.read_csv(summary_path)
+        source_id_by_output_name = {
+            spec["output_name"]: spec["id"] for spec in source_specs
+        }
+        if "source_output_name" in summary.columns:
+            summary["source_id"] = summary["source_output_name"].map(
+                source_id_by_output_name
+            )
+        summary_rows = _public_report_json_records(summary)
+
+    default_source = sources[0]["id"] if sources else None
+    default_year = max(sources[0]["years"]) if sources and sources[0]["years"] else None
+    return {
+        "sources": sources,
+        "summaryRows": summary_rows,
+        "metrics": [
+            {
+                "id": "cumulative_total_dc_load_mw",
+                "label": "Cumulative total load",
+                "shortLabel": "Total load",
+                "unit": "MW",
+            },
+            {
+                "id": "cumulative_new_dc_load_mw",
+                "label": "Cumulative new load",
+                "shortLabel": "New load",
+                "unit": "MW",
+            },
+            {
+                "id": "cumulative_total_dc_capacity_mw",
+                "label": "Cumulative total capacity",
+                "shortLabel": "Total capacity",
+                "unit": "MW",
+            },
+        ],
+        "defaultSourceId": default_source,
+        "defaultMetricId": "cumulative_total_dc_load_mw",
+        "defaultYear": default_year,
+    }
+
+
 def _write_public_report_suitability_map(
     output_dir,
     feasible_land,
@@ -6637,6 +7257,7 @@ def _write_public_report_suitability_map(
     social_friction_proxy_geojson = json.loads(social_friction_proxy.to_json())
     hosting_proxy_geojson = json.loads(hosting_proxy.to_json())
     ranked_rows = _build_public_report_suitability_map_rows(ranked_suitability)
+    buildout_timeline = _build_public_report_buildout_timeline_payload(output_dir)
 
     suitability_percentiles = [
         feature.get("properties", {}).get("suitability_percentile")
@@ -6939,6 +7560,7 @@ def _write_public_report_suitability_map(
             max-width: calc(100% - 32px);
             z-index: 2;
         }}
+        .mode-control,
         .shape-control {{
             display: inline-grid;
             grid-auto-flow: column;
@@ -6959,6 +7581,7 @@ def _write_public_report_suitability_map(
             border: 1px solid var(--control-border);
             box-shadow: 0 10px 24px var(--control-shadow);
         }}
+        .mode-toggle,
         .shape-toggle,
         .theme-toggle {{
             border: 0;
@@ -6970,10 +7593,54 @@ def _write_public_report_suitability_map(
             font-size: 0.82rem;
             cursor: pointer;
         }}
+        .mode-toggle.is-active,
         .shape-toggle.is-active,
         .theme-toggle.is-active {{
             background: var(--accent);
             color: var(--active-text);
+        }}
+        .timeline-panel {{
+            display: grid;
+            gap: 12px;
+        }}
+        .timeline-controls {{
+            display: grid;
+            grid-template-columns: repeat(2, minmax(0, 1fr));
+            gap: 10px;
+        }}
+        .timeline-control {{
+            display: grid;
+            gap: 5px;
+            color: var(--muted);
+            font-size: 0.78rem;
+        }}
+        .timeline-control select,
+        .timeline-control input[type="range"] {{
+            width: 100%;
+            min-width: 0;
+        }}
+        .timeline-control select {{
+            border: 1px solid var(--control-border);
+            border-radius: 8px;
+            padding: 8px 10px;
+            color: var(--ink);
+            background: var(--control-bg);
+            font: inherit;
+        }}
+        .timeline-year-row {{
+            grid-column: 1 / -1;
+        }}
+        .timeline-summary {{
+            display: grid;
+            grid-template-columns: repeat(3, minmax(0, 1fr));
+            gap: 8px;
+        }}
+        .timeline-summary .stat {{
+            border-radius: 12px;
+            padding: 10px;
+        }}
+        .timeline-summary .stat-value {{
+            font-size: 1.05rem;
         }}
         .layer-note {{
             margin: 0;
@@ -7006,11 +7673,13 @@ def _write_public_report_suitability_map(
             fill: var(--feasible-fill);
             stroke: var(--cell-stroke);
         }}
-        .suitability-cell {{
+        .suitability-cell,
+        .buildout-cell {{
             transition: stroke 120ms ease, stroke-width 120ms ease, filter 120ms ease;
             stroke: var(--cell-stroke);
         }}
-        .suitability-cell.is-active {{
+        .suitability-cell.is-active,
+        .buildout-cell.is-active {{
             stroke: var(--active-stroke);
             stroke-width: 1.8;
             filter: var(--active-filter);
@@ -7095,7 +7764,7 @@ def _write_public_report_suitability_map(
                 <div class=\"legend\">
                     <p class="note">The browser page keeps every developable execution-grid cell in view and uses the existing <strong>suitability_score</strong> field for ranking. Cells meeting the staged NLCD water/wetland screen remain visible but are clamped to 0 suitability percentile. The display layer can show geographically aligned square cells or honeycomb hexes for scanning, while preserving grid cell IDs for table, tooltip, and layer joins. State context uses true Census boundaries in Squares and snapped cell-edge outlines in Hexes. It now adds coarse zoning, permitting evidence, social-friction evidence, and hosting-capacity proxy layers, but those overlays remain screening proxies rather than entitlement, acceptance, or interconnection determinations.</p>
                     <div class=\"legend-bar\"></div>
-                    <span>Higher suitability percentile</span>
+                    <span id="legend-label">Higher suitability percentile</span>
                 </div>
             </section>
             <aside class=\"card panel\">
@@ -7120,6 +7789,41 @@ def _write_public_report_suitability_map(
                         <div class=\"stat\">
                             <div class=\"stat-label\">Percentile Range</div>
                             <div class=\"stat-value\" id=\"percentile-range\">0–0</div>
+                        </div>
+                    </div>
+                </section>
+                <section class="note timeline-panel" id="buildout-timeline-panel">
+                    <span class="eyebrow">Map Mode</span>
+                    <div class="mode-control" role="group" aria-label="Map mode">
+                        <button type="button" class="mode-toggle is-active" id="suitability-mode-toggle" aria-pressed="true">Suitability</button>
+                        <button type="button" class="mode-toggle" id="buildout-mode-toggle" aria-pressed="false">Buildout</button>
+                    </div>
+                    <div class="timeline-controls">
+                        <label class="timeline-control" for="buildout-source-select">
+                            Source
+                            <select id="buildout-source-select"></select>
+                        </label>
+                        <label class="timeline-control" for="buildout-metric-select">
+                            Metric
+                            <select id="buildout-metric-select"></select>
+                        </label>
+                        <label class="timeline-control timeline-year-row" for="buildout-year-range">
+                            Year <strong id="buildout-year-label">n/a</strong>
+                            <input type="range" id="buildout-year-range" min="0" max="0" step="1" value="0">
+                        </label>
+                    </div>
+                    <div class="timeline-summary">
+                        <div class="stat">
+                            <div class="stat-label">Total Load</div>
+                            <div class="stat-value" id="selected-buildout-total-load">n/a</div>
+                        </div>
+                        <div class="stat">
+                            <div class="stat-label">New Load</div>
+                            <div class="stat-value" id="selected-buildout-new-load">n/a</div>
+                        </div>
+                        <div class="stat">
+                            <div class="stat-label">Capacity</div>
+                            <div class="stat-value" id="selected-buildout-capacity">n/a</div>
                         </div>
                     </div>
                 </section>
@@ -7193,6 +7897,7 @@ def _write_public_report_suitability_map(
         const permittingProxyGeoJson = {json.dumps(permitting_proxy_geojson, separators=(",", ":"))};
         const socialFrictionProxyGeoJson = {json.dumps(social_friction_proxy_geojson, separators=(",", ":"))};
         const hostingProxyGeoJson = {json.dumps(hosting_proxy_geojson, separators=(",", ":"))};
+        const buildoutTimelineData = {json.dumps(buildout_timeline, separators=(",", ":"))};
         const rankedRows = {json.dumps(ranked_rows, separators=(",", ":"))};
         const mapSummary = {json.dumps(map_summary, separators=(",", ":"))};
 
@@ -7267,6 +7972,31 @@ def _write_public_report_suitability_map(
         const permittingProxyByKey = new Map();
         const socialFrictionProxyByKey = new Map();
         const hostingProxyByKey = new Map();
+        const suitabilityPropsByKey = new Map();
+        const buildoutCellPathsByKey = new Map();
+        const buildoutSources = buildoutTimelineData.sources || [];
+        const buildoutSourceById = new Map(buildoutSources.map((source) => [source.id, source]));
+        const buildoutMetricById = new Map((buildoutTimelineData.metrics || []).map((metric) => [metric.id, metric]));
+        const buildoutSummaryBySourceYear = new Map((buildoutTimelineData.summaryRows || []).map((row) => [`${{row.source_id}}:${{row.year}}`, row]));
+        let mapMode = "suitability";
+        let selectedBuildoutSourceId = buildoutTimelineData.defaultSourceId;
+        let selectedBuildoutMetricId = buildoutTimelineData.defaultMetricId || "cumulative_total_dc_load_mw";
+        let selectedBuildoutYear = buildoutTimelineData.defaultYear;
+        const suitabilityModeToggle = d3.select("#suitability-mode-toggle");
+        const buildoutModeToggle = d3.select("#buildout-mode-toggle");
+        const buildoutSourceSelect = d3.select("#buildout-source-select");
+        const buildoutMetricSelect = d3.select("#buildout-metric-select");
+        const buildoutYearRange = d3.select("#buildout-year-range");
+        const buildoutYearLabel = d3.select("#buildout-year-label");
+        const legendLabel = d3.select("#legend-label");
+        const formatMw = (value) => value == null || !Number.isFinite(Number(value)) ? "n/a" : `${{d3.format(",.0f")(Number(value))}} MW`;
+        const selectedBuildoutSource = () => buildoutSourceById.get(selectedBuildoutSourceId) || buildoutSources[0] || null;
+        const selectedBuildoutMetric = () => buildoutMetricById.get(selectedBuildoutMetricId) || (buildoutTimelineData.metrics || [])[0] || {{ id: selectedBuildoutMetricId, shortLabel: selectedBuildoutMetricId, unit: "MW" }};
+        const selectedBuildoutSummary = () => buildoutSummaryBySourceYear.get(`${{selectedBuildoutSourceId}}:${{selectedBuildoutYear}}`) || null;
+        const selectedBuildoutFeatures = () => {{
+            const source = selectedBuildoutSource();
+            return (source?.geoJson?.features || []).filter((feature) => Number(feature.properties?.year) === Number(selectedBuildoutYear));
+        }};
         const zoningProxyClassLabels = {{
             non_developed_context: "Non-developed context",
             developed_neighborhood_context: "Developed neighborhood context",
@@ -7321,6 +8051,12 @@ def _write_public_report_suitability_map(
             headroom: "rgba(12, 92, 89, 0.52)",
             unknown: "rgba(108, 115, 103, 0.0)",
         }};
+        features.forEach((feature) => {{
+            const key = cellKeyFromObject(feature.properties || {{}});
+            if (key) {{
+                suitabilityPropsByKey.set(key, feature.properties || {{}});
+            }}
+        }});
         let activeCellKey = null;
         const setActiveCellKey = (nextKey) => {{
             const normalizedKey = nextKey == null || nextKey === "" ? null : String(nextKey);
@@ -7329,11 +8065,13 @@ def _write_public_report_suitability_map(
             }}
             if (activeCellKey) {{
                 cellPathsByKey.get(activeCellKey)?.classed("is-active", false);
+                buildoutCellPathsByKey.get(activeCellKey)?.classed("is-active", false);
                 tableRowsByKey.get(activeCellKey)?.classed("is-active", false);
             }}
             activeCellKey = normalizedKey;
             if (activeCellKey) {{
                 cellPathsByKey.get(activeCellKey)?.classed("is-active", true);
+                buildoutCellPathsByKey.get(activeCellKey)?.classed("is-active", true);
                 tableRowsByKey.get(activeCellKey)?.classed("is-active", true);
             }}
         }};
@@ -7366,7 +8104,7 @@ def _write_public_report_suitability_map(
             }}
             return ` ${{generalDisplayName}} `.includes(` ${{contextDisplayName}} `) ? null : contextName;
         }};
-        const renderTooltip = (props, cellKey, zoningProps, permittingProps, socialFrictionProps, hostingProps) => {{
+        const renderTooltip = (props, cellKey, zoningProps, permittingProps, socialFrictionProps, hostingProps, buildoutProps = null) => {{
             const zoningClass = zoningProps?.zoning_proxy_class ?? "unknown";
             const zoningLabel = zoningProxyClassLabels[zoningClass] ?? zoningProxyClassLabels.unknown;
             const permittingClass = permittingProps?.permitting_proxy_class ?? "unknown";
@@ -7375,11 +8113,21 @@ def _write_public_report_suitability_map(
             const socialFrictionLabel = socialFrictionProxyClassLabels[socialFrictionClass] ?? socialFrictionProxyClassLabels.unknown;
             const proxyClass = hostingProps?.hosting_capacity_proxy_class ?? "unknown";
             const proxyLabel = hostingProxyClassLabels[proxyClass] ?? hostingProxyClassLabels.unknown;
+            const metric = selectedBuildoutMetric();
+            const buildoutLines = buildoutProps ? `
+                    Buildout source: ${{selectedBuildoutSource()?.label ?? "n/a"}}<br>
+                    Selected year: ${{buildoutProps.year ?? selectedBuildoutYear ?? "n/a"}}<br>
+                    ${{metric.shortLabel ?? metric.label}}: ${{formatMw(buildoutProps[metric.id])}}<br>
+                    Cumulative total load: ${{formatMw(buildoutProps.cumulative_total_dc_load_mw)}}<br>
+                    Cumulative new load: ${{formatMw(buildoutProps.cumulative_new_dc_load_mw)}}<br>
+                    Cumulative total capacity: ${{formatMw(buildoutProps.cumulative_total_dc_capacity_mw)}}<br>
+                ` : "";
             tooltip
                 .style("opacity", 1)
                 .html(`
                     <strong>${{displayCellName(props)}}</strong><br>
                     Cell ID: ${{cellKey}}<br>
+                    ${{buildoutLines}}
                     Local identity: ${{props.local_cell_name ?? "n/a"}}<br>
                     Identity stack: ${{props.general_american_cell_name_layer ?? "n/a"}} / ${{props.local_cell_name_layer ?? "n/a"}}<br>
                     Label source: ${{formatCellNameBasis(props.cell_name_basis, props.cell_name_match_scope)}}<br>
@@ -7414,6 +8162,7 @@ def _write_public_report_suitability_map(
                 <td>
                     <span class="cell-name">${{displayCellName(row)}}</span>
                     ${{displayContextCellName(row) ? `<span class="cell-meta">${{displayContextCellName(row)}}</span>` : ""}}
+                    <span class="cell-meta buildout-cell-meta"></span>
                 </td>
                 <td>${{row.suitability_percentile == null ? "" : d3.format(".1f")(row.suitability_percentile)}}</td>
                 <td>${{row.developable_capacity_mw == null ? "" : d3.format(",.0f")(row.developable_capacity_mw)}}</td>
@@ -7424,6 +8173,19 @@ def _write_public_report_suitability_map(
                 tableRowsByKey.set(key, d3.select(this));
             }}
         }});
+        const updateBuildoutTableMeta = () => {{
+            const metric = selectedBuildoutMetric();
+            const buildoutByKey = new Map(selectedBuildoutFeatures().map((feature) => [cellKeyFromObject(feature.properties || {{}}), feature.properties || {{}}]));
+            tableRows.select(".buildout-cell-meta")
+                .style("display", mapMode === "buildout" ? null : "none")
+                .text((row) => {{
+                    if (mapMode !== "buildout") {{
+                        return "";
+                    }}
+                    const buildoutProps = buildoutByKey.get(cellKeyFromObject(row));
+                    return `${{selectedBuildoutYear ?? "n/a"}} ${{metric.shortLabel ?? metric.label}}: ${{formatMw(buildoutProps?.[metric.id])}}`;
+                }});
+        }};
 
         const zoningLayerToggle = d3.select("#zoning-layer-toggle");
         const permittingLayerToggle = d3.select("#permitting-layer-toggle");
@@ -7703,11 +8465,15 @@ def _write_public_report_suitability_map(
             const hexShapeToggle = d3.select("#hex-shape-toggle");
             let stateBoundaryPaths = null;
             let hexStateBoundaryPaths = null;
+            let buildoutPaths = null;
             const updateCellDisplayGeometry = () => {{
                 svg.attr("data-display-mode", displayMode);
                 displayPathSelections.forEach((selection) => {{
                     selection.attr("d", (feature) => displayPathForMode(feature));
                 }});
+                if (buildoutPaths) {{
+                    buildoutPaths.attr("d", (feature) => displayPathForMode(feature));
+                }}
                 if (stateBoundaryPaths) {{
                     stateBoundaryPaths.classed("is-display-reference", displayMode === "hex");
                     stateBoundaryPaths.style("display", displayMode === "hex" ? "none" : null);
@@ -7933,6 +8699,157 @@ def _write_public_report_suitability_map(
                 syncHostingLayer();
             }});
             syncHostingLayer();
+
+            buildoutSourceSelect
+                .selectAll("option")
+                .data(buildoutSources)
+                .join("option")
+                .attr("value", (source) => source.id)
+                .text((source) => source.label);
+            buildoutMetricSelect
+                .selectAll("option")
+                .data(buildoutTimelineData.metrics || [])
+                .join("option")
+                .attr("value", (metric) => metric.id)
+                .text((metric) => metric.label);
+
+            const buildoutMetricMax = () => {{
+                const source = selectedBuildoutSource();
+                const metric = selectedBuildoutMetric();
+                return d3.max((source?.geoJson?.features || []), (feature) => Number(feature.properties?.[metric.id]) || 0) || 1;
+            }};
+            const syncBuildoutSummary = () => {{
+                const summary = selectedBuildoutSummary();
+                d3.select("#selected-buildout-total-load").text(formatMw(summary?.cumulative_total_dc_load_mw));
+                d3.select("#selected-buildout-new-load").text(formatMw(summary?.cumulative_new_dc_load_mw));
+                d3.select("#selected-buildout-capacity").text(formatMw(summary?.cumulative_total_dc_capacity_mw));
+            }};
+            const syncBuildoutTimelineControls = () => {{
+                const source = selectedBuildoutSource();
+                const years = source?.years || [];
+                if (!years.length) {{
+                    selectedBuildoutYear = null;
+                }} else if (!years.includes(Number(selectedBuildoutYear))) {{
+                    selectedBuildoutYear = d3.max(years);
+                }}
+                const yearIndex = Math.max(0, years.indexOf(Number(selectedBuildoutYear)));
+                buildoutSourceSelect
+                    .property("value", selectedBuildoutSourceId || "")
+                    .property("disabled", !buildoutSources.length);
+                buildoutMetricSelect
+                    .property("value", selectedBuildoutMetricId)
+                    .property("disabled", !(buildoutTimelineData.metrics || []).length);
+                buildoutYearRange
+                    .attr("max", Math.max(0, years.length - 1))
+                    .property("value", yearIndex)
+                    .property("disabled", !years.length);
+                buildoutYearLabel.text(selectedBuildoutYear ?? "n/a");
+                syncBuildoutSummary();
+                updateBuildoutTableMeta();
+            }};
+            const buildoutGroup = svg.append("g")
+                .attr("class", "buildout-timeline-layer")
+                .style("display", "none");
+            const renderBuildoutLayer = () => {{
+                const metric = selectedBuildoutMetric();
+                const maxValue = buildoutMetricMax();
+                const buildoutColor = d3.scaleSequential()
+                    .domain([0, maxValue])
+                    .interpolator(d3.interpolatePlasma);
+                buildoutCellPathsByKey.clear();
+                buildoutPaths = buildoutGroup
+                    .selectAll("path")
+                    .data(selectedBuildoutFeatures(), (feature) => cellKeyFromObject(feature.properties || {{}}))
+                    .join("path")
+                    .attr("class", "buildout-cell")
+                    .attr("data-cell-key", (feature) => cellKeyFromObject(feature.properties || {{}}))
+                    .attr("d", (feature) => displayPathForMode(feature))
+                    .attr("fill", (feature) => buildoutColor(Number(feature.properties?.[metric.id]) || 0))
+                    .attr("opacity", 0.84)
+                    .attr("stroke", "rgba(255,255,255,0.92)")
+                    .attr("stroke-width", 0.9)
+                    .on("mouseenter", (event, feature) => {{
+                        const buildoutProps = feature.properties || {{}};
+                        const cellKey = cellKeyFromObject(buildoutProps);
+                        const props = suitabilityPropsByKey.get(cellKey) || buildoutProps;
+                        setActiveCellKey(cellKey);
+                        positionTooltip(event);
+                        renderTooltip(
+                            props,
+                            cellKey,
+                            zoningProxyByKey.get(cellKey),
+                            permittingProxyByKey.get(cellKey),
+                            socialFrictionProxyByKey.get(cellKey),
+                            hostingProxyByKey.get(cellKey),
+                            buildoutProps,
+                        );
+                    }})
+                    .on("mousemove", (event) => {{
+                        positionTooltip(event);
+                    }})
+                    .on("mouseleave", () => {{
+                        setActiveCellKey(null);
+                        tooltip.style("opacity", 0);
+                    }});
+                buildoutPaths.each(function(feature) {{
+                    const key = cellKeyFromObject(feature.properties || {{}});
+                    if (key) {{
+                        buildoutCellPathsByKey.set(key, d3.select(this));
+                    }}
+                }});
+            }};
+            const syncMapMode = () => {{
+                const buildoutModeAvailable = Boolean(selectedBuildoutSource());
+                if (mapMode === "buildout" && !buildoutModeAvailable) {{
+                    mapMode = "suitability";
+                }}
+                suitabilityPaths.style("display", mapMode === "suitability" ? null : "none");
+                buildoutGroup.style("display", mapMode === "buildout" ? null : "none");
+                suitabilityModeToggle
+                    .classed("is-active", mapMode === "suitability")
+                    .attr("aria-pressed", mapMode === "suitability" ? "true" : "false");
+                buildoutModeToggle
+                    .classed("is-active", mapMode === "buildout")
+                    .attr("aria-pressed", mapMode === "buildout" ? "true" : "false")
+                    .property("disabled", !buildoutModeAvailable);
+                const metric = selectedBuildoutMetric();
+                legendLabel.text(mapMode === "buildout" ? `Higher selected ${{metric.shortLabel ?? metric.label}}` : "Higher suitability percentile");
+                updateBuildoutTableMeta();
+            }};
+            const setMapMode = (nextMode) => {{
+                if (!['suitability', 'buildout'].includes(nextMode)) {{
+                    return;
+                }}
+                mapMode = nextMode;
+                renderBuildoutLayer();
+                syncMapMode();
+            }};
+            suitabilityModeToggle.on("click", () => setMapMode("suitability"));
+            buildoutModeToggle.on("click", () => setMapMode("buildout"));
+            buildoutSourceSelect.on("change", (event) => {{
+                selectedBuildoutSourceId = event.target.value;
+                selectedBuildoutYear = null;
+                syncBuildoutTimelineControls();
+                renderBuildoutLayer();
+                syncMapMode();
+            }});
+            buildoutMetricSelect.on("change", (event) => {{
+                selectedBuildoutMetricId = event.target.value;
+                syncBuildoutTimelineControls();
+                renderBuildoutLayer();
+                syncMapMode();
+            }});
+            buildoutYearRange.on("input", (event) => {{
+                const source = selectedBuildoutSource();
+                const years = source?.years || [];
+                selectedBuildoutYear = years[Number(event.target.value)] ?? selectedBuildoutYear;
+                syncBuildoutTimelineControls();
+                renderBuildoutLayer();
+                syncMapMode();
+            }});
+            syncBuildoutTimelineControls();
+            renderBuildoutLayer();
+            syncMapMode();
 
             stateBoundaryPaths = svg.append("g")
                 .selectAll("path")
@@ -8206,6 +9123,15 @@ def _build_public_report_reeds_integration_contract(repo_root, output_dir):
     capacity_constraint_assumptions = _build_public_report_capacity_constraint_assumptions(
         _load_public_report_bundle_smoke_configs(repo_root)
     )
+    spatial_grid_contract = _build_public_report_grid_resolution_contract(repo_root)
+    allocation_assumption_contract = _build_public_report_allocation_assumption_contract(
+        repo_root,
+        output_dir=output_dir,
+        temporal_assumptions=temporal_assumptions,
+        spatial_grid_contract=spatial_grid_contract,
+        capacity_constraint_assumptions=capacity_constraint_assumptions,
+    )
+    baxtel_schema_contract = _build_public_report_baxtel_schema_contract(repo_root)
 
     handoff_products = _build_public_report_reeds_handoff_products(output_dir)
     validation_checks = _build_public_report_reeds_validation_checks(output_dir, handoff_products)
@@ -8255,16 +9181,63 @@ def _build_public_report_reeds_integration_contract(repo_root, output_dir):
                 if check["name"] == "per_site_time_step_capacity_limit"
             ),
         },
+        "allocation_contract": {
+            "allocation_parity_status": allocation_assumption_contract["parity_status"],
+            "allocation_parity_blockers": allocation_assumption_contract["parity_blockers"],
+            "allocation_contract_path": (
+                output_dir / "public_report_allocation_assumption_contract.json"
+            ).as_posix(),
+            "current_bundle_allocation_algorithm": allocation_assumption_contract[
+                "current_bundle"
+            ]["allocation_algorithm"],
+            "current_bundle_projection_resolutions": allocation_assumption_contract[
+                "current_bundle"
+            ]["projection_resolutions"],
+            "report_reference_allocation_mode": allocation_assumption_contract[
+                "report_reference"
+            ]["allocation_mode"],
+        },
+        "baxtel_schema_contract": {
+            "baxtel_schema_parity_status": baxtel_schema_contract["parity_status"],
+            "baxtel_schema_parity_blockers": baxtel_schema_contract["parity_blockers"],
+            "baxtel_schema_contract_path": (
+                output_dir / "public_report_baxtel_schema_contract.json"
+            ).as_posix(),
+            "trained_suitability_parity_path": baxtel_schema_contract["decision"][
+                "trained_suitability_parity_path"
+            ],
+            "baxtel_schema_available": baxtel_schema_contract["current_evidence"][
+                "baxtel_schema_available"
+            ],
+            "public_baseline_available": baxtel_schema_contract["current_evidence"][
+                "public_baseline_available"
+            ],
+        },
         "spatial_contract": {
             "grid_cell_key": "sc_point_gid",
             "regional_group_key": "zone_group",
             "current_bundle_grid_path": (repo_root / PUBLIC_REPORT_BUNDLE_GRID_PATH).as_posix(),
             "current_bundle_grid_priority": PUBLIC_REPORT_BUNDLE_GRID_PRIORITY,
             "report_reference_grid_resolution_km": PUBLIC_REPORT_REFERENCE_GRID_RESOLUTION_KM,
+            "linkedin_aggregation_grid_resolution_km": PUBLIC_REPORT_LINKEDIN_AGGREGATION_GRID_RESOLUTION_KM,
+            "current_bundle_grid_resolution_km": spatial_grid_contract["current_bundle"][
+                "median_equivalent_square_resolution_km"
+            ],
+            "spatial_parity_status": spatial_grid_contract["parity_status"],
+            "spatial_parity_blockers": spatial_grid_contract["parity_blockers"],
+            "grid_resolution_contract_path": (
+                output_dir / "public_report_grid_resolution_contract.json"
+            ).as_posix(),
             "bounded_spatial_note": "The current contract is anchored to the fixture execution grid and bounded feasible-land rule, not a reproduced nationwide report surface.",
         },
         "supporting_artifacts": {
             "assumption_registry_path": (output_dir / "public_report_assumption_registry.json").as_posix(),
+            "allocation_contract_path": (
+                output_dir / "public_report_allocation_assumption_contract.json"
+            ).as_posix(),
+            "baxtel_schema_contract_path": (
+                output_dir / "public_report_baxtel_schema_contract.json"
+            ).as_posix(),
             "limitations_path": (output_dir / "public_report_limitations.md").as_posix(),
             "deviation_note_path": (output_dir / "public_report_bundle_deviations.md").as_posix(),
         },
@@ -8676,6 +9649,15 @@ def run_public_report_bundle(
             ),
         },
         {
+            "step_id": "write_cumulative_buildout",
+            "runner": lambda: _write_public_report_bundle_cumulative_buildout(
+                repo_root,
+                output_dir,
+                reproduction_status_path,
+                bundle_status_path=bundle_status_path,
+            ),
+        },
+        {
             "step_id": "write_grid_surfaces",
             "runner": lambda: _write_public_report_bundle_grid_surfaces(
                 repo_root,
@@ -8684,12 +9666,24 @@ def run_public_report_bundle(
             ),
         },
         {
-            "step_id": "write_cumulative_buildout",
-            "runner": lambda: _write_public_report_bundle_cumulative_buildout(
+            "step_id": "write_grid_resolution_contract",
+            "runner": lambda: _write_public_report_grid_resolution_contract(
                 repo_root,
                 output_dir,
-                reproduction_status_path,
-                bundle_status_path=bundle_status_path,
+            ),
+        },
+        {
+            "step_id": "write_allocation_assumption_contract",
+            "runner": lambda: _write_public_report_allocation_assumption_contract(
+                repo_root,
+                output_dir,
+            ),
+        },
+        {
+            "step_id": "write_baxtel_schema_contract",
+            "runner": lambda: _write_public_report_baxtel_schema_contract(
+                repo_root,
+                output_dir,
             ),
         },
         {

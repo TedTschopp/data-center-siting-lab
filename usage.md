@@ -270,7 +270,7 @@ Behavior:
   `public_report_census_geolookup_misses.md` so retained Census misses can be
   reviewed by nearest-state fallback, boundary/coastal class, water/wetland clamp
   status, and map-impact class.
-- The D3 map HTML page embeds the bounded feasible-land and suitability surfaces in a single browser-rendered file so you can inspect the map without opening GIS software. The underlying grid remains the internal model, but the browser display draws grid-backed cells as fitted hexagons for quicker visual scanning. Water/wetland-flagged cells remain in the map footprint at `0` suitability percentile. Optional state-boundary, zoning-proxy, permitting / ordinance evidence, social-friction evidence, and hosting-capacity proxy layers provide bounded context overlays without replacing the base suitability surface.
+- The D3 map HTML page embeds the bounded feasible-land and suitability surfaces in a single browser-rendered file so you can inspect the map without opening GIS software. The underlying grid remains the internal model, but the browser display draws grid-backed cells as fitted hexagons for quicker visual scanning. Water/wetland-flagged cells remain in the map footprint at `0` suitability percentile. Optional state-boundary, zoning-proxy, permitting / ordinance evidence, social-friction evidence, and hosting-capacity proxy layers provide bounded context overlays without replacing the base suitability surface. The map also includes a buildout mode with source, metric, and year controls for bounded cumulative smoke-output review; those controls do not imply report-equivalent temporal parity.
 - The assumption registry JSON records the current scenario inputs, report-reference
   assumptions, bounded bundle rules, output labels, and explicit assumption gaps so
   future report runs can be compared consistently. Its temporal-assumption contract
@@ -278,16 +278,26 @@ Behavior:
   2025 through 2050 at the tracked reporting steps, and a 25-year cumulative
   buildout horizon through 2050. The current bounded bundle keeps its configured
   2022 starting-stock field until the 2025 source and exact report semantics can be
-	validated. It also records the capacity-constraint contract: public smoke configs
-	use an 0.88 utilization factor and a 1000 MW per-site time-step nameplate capacity
-	cap. When projected demand exceeds capped available capacity, the downscale output
-	remains capacity-limited rather than forcing excess load into a grid cell, and
-	cumulative outputs expose load and capacity-equivalent fields.
+  validated. It also records the capacity-constraint contract: public smoke configs
+  use an 0.88 utilization factor and a 1000 MW per-site time-step nameplate capacity
+  cap. When projected demand exceeds capped available capacity, the downscale output
+  remains capacity-limited rather than forcing excess load into a grid cell, and
+  cumulative outputs expose load and capacity-equivalent fields. The same registry
+  carries the grid-resolution contract, including the current execution-grid
+  measurement and its blocked status against the report-reference 5.76 km national
+  grid. It also carries the allocation-assumption contract, which records the
+  current weighted-bootstrap allocation mechanics and blocks report-equivalent
+  allocation until the exact report algorithm and trained suitability surface are
+  recovered. The same bundle writes a Baxtel schema contract that records the
+  vendor procurement path, compares available schema evidence against the public
+  data-center baseline, and blocks trained-suitability parity until the Baxtel
+  schema, 2025 operating baseline, and training workflow are recovered.
 - The limitations note carries forward the named LinkedIn refinement gaps such as local transmission hosting capacity, demand queue times, zoning, permitting, capacity scaling, and social acceptance so the bundle does not imply full siting fidelity. Zoning, permitting, social friction, and hosting now have bounded proxy layers, but the note keeps the limits explicit so proxy evidence is not misread as entitlement, permit readiness, social acceptance, or local interconnection feasibility.
 - The ReEDS integration contract JSON defines the current handoff products,
   required columns, annual time assumptions, capacity-constraint assumptions,
-  spatial keys, and validation checks for using the bounded bundle in ReEDS-facing
-  workflows.
+  spatial keys, grid-resolution parity status, allocation-assumption parity status,
+  Baxtel schema parity status, and validation checks for using the bounded bundle in
+  ReEDS-facing workflows.
 - The cumulative buildout GeoPackages add `baseline_total_dc_load_mw`,
   `cumulative_new_dc_load_mw`, `cumulative_total_dc_load_mw`, and capacity-equivalent
   columns so the bundle can support cumulative buildout maps or downstream animation

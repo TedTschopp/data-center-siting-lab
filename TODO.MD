@@ -65,15 +65,16 @@ public-source approximation.
 Keep this section aligned with the open checklist below. When priorities or
 dependencies change, update this order in the same change.
 
-Current recommended next action: evaluate and implement the report-equivalent
-national grid-resolution contract now that utilization and per-site capacity
-constraints are explicitly encoded and validated.
+Current recommended next action: perform a final report-bundle QA pass and add new
+backlog items for any remaining usability or parity gaps. The numbered report-bundle
+blockers currently listed below are complete.
 
 Immediate follow-up order:
 
-1. Evaluate and implement report-equivalent national grid resolution.
-2. Pursue the remaining report-parity blockers: exact downscaling
-      rules, and Baxtel suitability-surface parity.
+1. Review the generated HTML report and regenerated contract artifacts end to end.
+2. If Baxtel access is later obtained, place the licensed/sample CSV at the tracked
+      local path and rerun the Baxtel schema contract before revisiting trained
+      suitability parity.
 
 ## Priority 1: Core Blockers
 
@@ -734,7 +735,7 @@ Immediate follow-up order:
       registry plus ReEDS contract validate those settings while keeping unrecovered
       report semantics explicit.
 
-- [ ] 42. Evaluate and implement report-equivalent national grid resolution.
+- [x] 42. Evaluate and implement report-equivalent national grid resolution.
       Evidence: the report references a 5.76 km grid and LinkedIn text references a
       5 km aggregation surface, while the bounded public bundle currently uses the
       repo's existing execution grid.
@@ -742,8 +743,17 @@ Immediate follow-up order:
       generate or document the national grid needed for parity, preserve stable cell
       IDs, and validate that downstream map, ranked-table, and downscaling outputs use
       the intended spatial footprint.
+      Outcome: completed through an explicit spatial contract. The report bundle now
+      writes `public_report_grid_resolution_contract.json`, measures the current
+      execution grid in EPSG:5070, compares it with the report-reference 5.76 km grid
+      and LinkedIn 5 km aggregation language, and carries the blocked parity status
+      through the assumption registry and ReEDS contract. The measured current grid is
+      approximately 46.08 km per cell, or 8x coarser per dimension than the report
+      reference. The bundle preserves current stable `sc_point_gid` values and does
+      not subdivide the fixture grid because doing so would invent unvalidated
+      suitability, capacity, and exclusion data.
 
-- [ ] 43. Implement exact report downscaling allocation assumptions where recoverable.
+- [x] 43. Implement exact report downscaling allocation assumptions where recoverable.
       Evidence: the bounded public bundle distributes public smoke-test EER outputs
       onto the current suitability surface, but the report's exact allocation rules are
       not yet proven equivalent.
@@ -751,8 +761,16 @@ Immediate follow-up order:
       for regional EER projections, cumulative buildout, and time-stepped outputs; if
       the exact assumptions remain unavailable, document the non-equivalence as an
       explicit parity blocker.
+      Outcome: completed through an explicit allocation-assumption contract. The
+      bundle now writes `public_report_allocation_assumption_contract.json`, records
+      the current bounded method as weighted-bootstrap random allocation over the
+      current `suitability_score` surface, validates total and grouped regional smoke
+      paths plus cumulative and summary outputs, and carries blocked parity through
+      the assumption registry and ReEDS contract. Exact report allocation remains
+      blocked because the report algorithm and report-trained suitability surface are
+      not recovered.
 
-- [ ] 44. Obtain Baxtel schema evidence and decide the trained-suitability parity path.
+- [x] 44. Obtain Baxtel schema evidence and decide the trained-suitability parity path.
       Evidence: the largest remaining strategic blocker is still Baxtel/schema
       parity. The repo has a procurement path, but exact reproduction remains blocked
       until a sample or licensed schema is obtained and compared against the public
@@ -761,6 +779,14 @@ Immediate follow-up order:
       the public baseline, and use that comparison to decide whether the
       report-aligned Baxtel-trained suitability surface is feasible or must remain
       explicitly non-equivalent.
+      Outcome: completed through an explicit Baxtel schema contract. The bundle now
+      writes `public_report_baxtel_schema_contract.json`, records the Baxtel vendor
+      procurement path, compares any local `baxtel_data_center_sites.csv` schema
+      against the public data-center baseline schema, and carries blocked trained-
+      suitability parity through the assumption registry and ReEDS contract. Because
+      no Baxtel sample or licensed schema is present in the public repo, the current
+      decision remains `blocked-commercial-schema-required` rather than a claim of
+      report-equivalent Baxtel-trained suitability.
 
 - [x] 45. Fix the generated name labels for report-bundle cells.
       Evidence: the bounded report-bundle map and ranked-cell table now expose
@@ -804,7 +830,7 @@ Immediate follow-up order:
       those rows: outside-boundary misses receive a dedicated boundary/coastal display
       label, and the change is regression-tested in `tests/test_public_data.py`.
 
-- [ ] 47. Add a buildout timeline mode to the generated HTML report.
+- [x] 47. Add a buildout timeline mode to the generated HTML report.
       Evidence: the bounded bundle already writes year-by-year cumulative buildout
       artifacts (`public_eer_total_downscaled_cumulative_buildout.gpkg`,
       `public_eer_regional_downscaled_cumulative_buildout.gpkg`, and
@@ -815,6 +841,12 @@ Immediate follow-up order:
       regional source selection when useful, map styling for cumulative load or new
       load, selected-year summary totals, and tooltip/table fields that explain the
       selected year without implying report-equivalent temporal parity.
+      Outcome: completed. The generated D3 map now embeds the cumulative buildout
+      payload from the total and grouped regional cumulative GeoPackages plus summary
+      CSV, exposes Suitability and Buildout map modes, provides source, metric, and
+      year controls, updates selected-year load/capacity summary totals, colors the
+      map by the selected buildout metric, and adds selected-year buildout context to
+      tooltips and ranked-table rows without asserting temporal report parity.
 
 ## Ongoing Rule
 

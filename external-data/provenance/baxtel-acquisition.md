@@ -1,8 +1,8 @@
 # Baxtel Acquisition
 
-- Source page: https://baxtel.com/services/datasets
-- Quote page: https://baxtel.com/quotes/new
-- Contact page: https://baxtel.com/contacts/new
+- Source page: <https://baxtel.com/services/datasets>
+- Quote page: <https://baxtel.com/quotes/new>
+- Contact page: <https://baxtel.com/contacts/new>
 - Presentation anchor: Baxtel for U.S. data center sites
 - Repo-local staging command:
   `python -m reVeal.public_data stage-dataset baxtel_us_data_center_sites --repo-root .`
@@ -36,6 +36,12 @@ defined manual procurement dependency for licensed users.
 4. Keep the delivered payload out of git and treat it as license-bound source data.
 5. Use the sample schema or licensed export to compare field coverage against the
    public baseline and update repo-local documentation if the licensed path is used.
+
+The report-bundle workflow now writes
+`external-data/derived/report-bundle/public_report_baxtel_schema_contract.json` to
+record that comparison. If the local Baxtel CSV is absent, the contract keeps the
+trained-suitability path blocked as a commercial-schema and 2025 operating-baseline
+dependency.
 
 ## Posture
 

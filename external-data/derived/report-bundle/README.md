@@ -22,8 +22,10 @@ Track the durable inputs and recipes instead:
 - provenance notes under `external-data/provenance/`
 - user-facing usage and dataset documentation
 
-Regenerate the local bundle whenever you need the HTML map, GeoPackages, manifest,
-status JSON, deviation note, ranked CSV, cumulative buildout surfaces, or cached
+Regenerate the local bundle whenever you need the HTML map with buildout timeline
+controls, GeoPackages, manifest,
+status JSON, deviation note, ranked CSV, grid-resolution contract, allocation-assumption contract, Baxtel schema contract,
+cumulative buildout surfaces, or cached
 state-boundary source ZIP. The default run also writes Census GeoLookup miss review
 artifacts and a generated
 `public_report_census_geography_cache.json` file for Census coordinate GeoLookup

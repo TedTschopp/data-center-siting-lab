@@ -77,7 +77,10 @@ for that derived workflow.
 |       Bounded permitting / ordinance proxy layer | `python -m reVeal.public_data run-public-report-bundle --output-dir external-data/derived/report-bundle`                                                                                                     | staged `external-data/manifest/permitting-ordinance-evidence.csv` rows with public evidence points assigned to execution-grid cells; classes are evidence signals, not permit-readiness determinations                  | `external-data/derived/report-bundle/public_report_permitting_proxy.gpkg`                      | focused pytest coverage plus `run-public-report-bundle`                             |
 |               Bounded social-friction proxy layer | `python -m reVeal.public_data run-public-report-bundle --output-dir external-data/derived/report-bundle`                                                                                                     | staged `external-data/manifest/social-friction-evidence.csv` rows with public evidence points assigned to execution-grid cells; classes are evidence signals, not community-acceptance measurements                    | `external-data/derived/report-bundle/public_report_social_friction_proxy.gpkg`                 | focused pytest coverage plus `run-public-report-bundle`                             |
 |             Bounded hosting-capacity proxy layer | `python -m reVeal.public_data run-public-report-bundle --output-dir external-data/derived/report-bundle`                                                                                                     | NERC reserve-margin assessment areas mapped into `tests/data/downscale/inputs/regions/eer_adp_zones.gpkg` and then transferred onto the execution-grid cells as a coarse regional headroom proxy                      | `external-data/derived/report-bundle/public_report_hosting_capacity_proxy.gpkg`               | focused pytest coverage plus `run-public-report-bundle`                             |
-|                         Bounded suitability map page | `python -m reVeal.public_data run-public-report-bundle --output-dir external-data/derived/report-bundle`                                                                                                     | bounded feasible-land, suitability, state-boundary, zoning-proxy, permitting-proxy, social-friction-proxy, and hosting-proxy surfaces embedded in one HTML page with D3; grid-backed cells can render as original geographic squares or display-only honeycomb hexes while ranked rows bind back to the matching map cell by stable cell id | `external-data/derived/report-bundle/public_report_suitability_map.html`                      | focused pytest coverage plus `run-public-report-bundle`                             |
+|                         Bounded suitability map page | `python -m reVeal.public_data run-public-report-bundle --output-dir external-data/derived/report-bundle`                                                                                                     | bounded feasible-land, suitability, state-boundary, zoning-proxy, permitting-proxy, social-friction-proxy, hosting-proxy, and cumulative buildout timeline surfaces embedded in one HTML page with D3; grid-backed cells can render as original geographic squares or display-only honeycomb hexes while ranked rows bind back to the matching map cell by stable cell id | `external-data/derived/report-bundle/public_report_suitability_map.html`                      | focused pytest coverage plus `run-public-report-bundle`                             |
+|                  Report grid-resolution contract | `python -m reVeal.public_data run-public-report-bundle --output-dir external-data/derived/report-bundle`                                                                                                     | measured current execution-grid geometry compared with the report-reference 5.76 km grid and LinkedIn 5 km aggregation surface                                                                                       | `external-data/derived/report-bundle/public_report_grid_resolution_contract.json`             | focused pytest coverage plus `run-public-report-bundle`                             |
+|              Report allocation-assumption contract | `python -m reVeal.public_data run-public-report-bundle --output-dir external-data/derived/report-bundle`                                                                                                     | current weighted-bootstrap allocation mechanics, regional/total smoke configs, cumulative output checks, and unrecovered report allocation assumptions                                                                | `external-data/derived/report-bundle/public_report_allocation_assumption_contract.json`       | focused pytest coverage plus `run-public-report-bundle`                             |
+|                    Report Baxtel schema contract | `python -m reVeal.public_data run-public-report-bundle --output-dir external-data/derived/report-bundle`                                                                                                     | Baxtel commercial procurement path, available local schema evidence, public data-center baseline schema, and trained-suitability parity decision                                                                      | `external-data/derived/report-bundle/public_report_baxtel_schema_contract.json`              | focused pytest coverage plus `run-public-report-bundle`                             |
 |                           Report assumption registry | `python -m reVeal.public_data run-public-report-bundle --output-dir external-data/derived/report-bundle`                                                                                                     | `external-data/derived/eer/config_public_total_smoke.json`; `external-data/derived/eer/config_public_regional_smoke.json`; bounded bundle rules                                                                     | `external-data/derived/report-bundle/public_report_assumption_registry.json`                  | focused pytest coverage plus `run-public-report-bundle`                             |
 |                              Report limitations note | `python -m reVeal.public_data run-public-report-bundle --output-dir external-data/derived/report-bundle`                                                                                                     | LinkedIn limitation and refinement set carried forward through bounded bundle rules                                                                                                                                 | `external-data/derived/report-bundle/public_report_limitations.md`                            | focused pytest coverage plus `run-public-report-bundle`                             |
 |                           ReEDS integration contract | `python -m reVeal.public_data run-public-report-bundle --output-dir external-data/derived/report-bundle`                                                                                                     | bounded bundle outputs, annual cumulative buildout artifacts, ranked suitability table, and current bundle assumptions                                                                                              | `external-data/derived/report-bundle/public_report_reeds_integration_contract.json`           | focused pytest coverage plus `run-public-report-bundle`                             |
@@ -250,6 +253,11 @@ The current bounded public bundle is not report-equivalent for these reasons:
 
 - The current downscale configs use `tests/data/downscale/inputs/grid_char_weighted_scores.gpkg`
   as the execution grid rather than a reproduced nationwide report surface.
+- The current grid-resolution contract measures that execution grid at roughly
+  `46.08` km cells in EPSG:5070, which is 8x coarser in each dimension than the
+  report-reference `5.76` km grid. The bundle therefore preserves current stable
+  `sc_point_gid` values and records the report-equivalent national grid as blocked
+  until the source grid or generation rule is recovered.
 - The current configs use a `baseline_year` of `2022`, while the report narrative
   and LinkedIn Part II description frame the scenario around operating data centers
   in `2025`.
@@ -266,6 +274,21 @@ The current bounded public bundle is not report-equivalent for these reasons:
   converts those values into load-equivalent limits before distributing projected
   demand, remains capacity-limited when projected demand exceeds capped available
   capacity, and writes capacity-equivalent cumulative buildout fields for review.
+- The current allocation-assumption contract records the implemented bounded
+  allocation method as a weighted-bootstrap random shuffle over the current
+  `suitability_score` priority field. It validates that total and grouped regional
+  smoke paths, cumulative outputs, and summary outputs are present, but keeps exact
+  report allocation parity blocked because the report algorithm and report-trained
+  suitability surface have not been recovered.
+- The current Baxtel schema contract records the vendor procurement path and compares
+  any local `external-data/raw/data-centers/baxtel_data_center_sites.csv` schema
+  against the public OSM/Wikidata/manual baseline. In the current public bundle, no
+  Baxtel sample or licensed schema is available, so trained-suitability parity remains
+  blocked as a commercial-schema and 2025 operating-baseline dependency.
+- The current HTML map includes a bounded buildout timeline mode backed by the total
+  and grouped regional cumulative smoke-output artifacts. The mode exposes selected
+  year, source, cumulative load, new load, and capacity-equivalent values, but it is
+  not a report-equivalent 2025-to-2050 buildout animation.
 - The current grid priority field is a pre-existing `suitability_score`, not a
   reproduced Baxtel-trained random-forest output from the report methodology.
 - The current feasible-land output is a bounded approximation that keeps cells where
@@ -287,6 +310,17 @@ The current bounded public bundle is not report-equivalent for these reasons:
   proxy, not a reproduced local transmission hosting-capacity surface.
 - The current assumption registry makes those bounded choices explicit, but it does
   not turn them into report-equivalent methodology.
+- The current grid-resolution contract, assumption registry, and ReEDS contract make
+  the spatial parity blocker explicit: the current execution grid is not the
+  report-equivalent national grid and should not be subdivided into 5.76 km cells
+  without validated source suitability, capacity, and exclusion data.
+- The current allocation-assumption contract, assumption registry, and ReEDS
+  contract make the allocation-method blocker explicit: the current bounded workflow
+  is mechanically validated, but it is not asserted as report-equivalent allocation.
+- The current Baxtel schema contract, assumption registry, and ReEDS contract make
+  the trained-suitability blocker explicit: the current public baseline is useful for
+  a bounded open approximation, but it is not asserted as a Baxtel-trained report
+  surface.
 - The current assumption registry and ReEDS contract validate the explicit 88%
   utilization and 1 GW per-cell time-step capacity cap, but those settings remain
   bounded assumptions rather than recovered report source data.
@@ -303,8 +337,11 @@ These report-layer outputs remain out of scope for the current bounded public
 bundle:
 
 - report-equivalent feasible-land map derived from a reproduced exclusion stack
+- report-equivalent 5.76 km national grid with stable report cell IDs
 - report-equivalent suitability percentile map derived from the trained nationwide model
 - report-equivalent scored and ranked nationwide siting surface from the report methodology
+- report-equivalent Baxtel 2025 operating baseline and licensed/schema-validated
+  training labels
 - report-equivalent cumulative buildout animation starting from a reproduced 2025
   operating baseline, report-equivalent suitability surface, and fully recovered
   capacity-constrained allocation semantics

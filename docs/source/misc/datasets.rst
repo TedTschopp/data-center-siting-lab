@@ -277,6 +277,24 @@ capacity cap, which the downscale path converts to load-equivalent allocation
 limits. When projected demand exceeds capped available capacity, the output remains
 capacity-limited instead of forcing excess load into a grid cell. The cumulative
 buildout artifacts expose both load and capacity-equivalent fields.
+The bundle also writes a grid-resolution contract. It measures the current
+execution grid, compares it with the report-reference 5.76 km grid and the
+LinkedIn 5 km aggregation language, and records the current grid as a spatial
+parity blocker rather than subdividing the existing cells into unvalidated 5.76 km
+surfaces.
+It also writes an allocation-assumption contract. That contract records the current
+bounded method as weighted-bootstrap random allocation over the current
+``suitability_score`` surface, validates that total, grouped regional, cumulative,
+and summary artifacts are present, and keeps exact report allocation parity blocked
+until the report algorithm and trained suitability surface are recovered.
+The Baxtel schema contract records the vendor procurement path, compares any local
+Baxtel sample or licensed CSV schema against the public data-center baseline, and
+keeps trained-suitability parity blocked until the Baxtel schema, 2025 operating
+baseline, and model-training workflow are recovered.
+The generated D3 map also includes a buildout timeline mode. Reviewers can switch
+from the static suitability surface to bounded cumulative buildout by source,
+metric, and year, using the existing cumulative smoke-output artifacts without
+asserting report-equivalent temporal parity.
 
 The limitations note carries forward the named LinkedIn refinement gaps directly
 into the generated bundle. It explicitly states that local transmission hosting
@@ -289,7 +307,8 @@ local interconnection feasibility.
 
 The ReEDS integration contract JSON defines the bounded handoff surface for
 ReEDS-facing workflows. It records the current handoff products, required
-columns, annual modeled years, spatial join keys, and the validation checks that
+columns, annual modeled years, spatial join keys, grid-resolution parity status,
+allocation-assumption parity status, Baxtel schema parity status, and the validation checks that
 must pass before the bounded bundle is treated as a load-forecasting handoff.
 
 Like the other checkpointed workflows, the command emits step-level progress to
