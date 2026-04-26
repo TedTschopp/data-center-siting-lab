@@ -4,6 +4,7 @@ Utilities for sourcing and transforming public data artifacts used with reVeal.
 """
 from __future__ import annotations
 
+from concurrent.futures import ThreadPoolExecutor, as_completed
 from dataclasses import dataclass
 from pathlib import Path
 import argparse
@@ -4326,7 +4327,15 @@ def _write_public_report_census_geography_cache(cache_path, cache):
     cache_path.write_text(json.dumps(cache, indent=2, sort_keys=True))
 
 
-def _fetch_public_report_census_geographies(frame, cache_path=None, timeout=30):
+def _fetch_public_report_census_geographies(
+    frame,
+    cache_path=None,
+    timeout=30,
+    max_workers=8,
+    progress_label=None,
+    progress_interval=100,
+    cache_write_interval=25,
+):
     """Fetch Census coordinate GeoLookup identity records for report cells with caching."""
     if (
         "latitude" not in frame.columns
@@ -4343,8 +4352,8 @@ def _fetch_public_report_census_geographies(frame, cache_path=None, timeout=30):
         lookup_points = lookup_frame.geometry.representative_point()
 
     cache = _load_public_report_census_geography_cache(cache_path) if cache_path else {}
-    records = []
-    cache_changed = False
+    records_by_index = {}
+    lookup_requests = []
     for index, row in frame.iterrows():
         latitude = _coerce_public_report_coordinate_value(row.get("latitude"))
         longitude = _coerce_public_report_coordinate_value(row.get("longitude"))
@@ -4360,29 +4369,67 @@ def _fetch_public_report_census_geographies(frame, cache_path=None, timeout=30):
             invalid_coordinate = False
 
         if invalid_coordinate:
-            records.append(_extract_public_report_census_geography_record(None))
+            records_by_index[index] = _extract_public_report_census_geography_record(None)
             continue
 
         cache_key = _public_report_census_cache_key(latitude, longitude)
-        if cache_key not in cache:
-            try:
-                cache[cache_key] = _fetch_public_report_census_geography(
-                    latitude,
-                    longitude,
-                    timeout=timeout,
-                )
-            except (json.JSONDecodeError, KeyError, OSError, TimeoutError, urllib.error.URLError) as error:
-                cache[cache_key] = {
-                    **_extract_public_report_census_geography_record(None),
-                    "census_geolookup_status": "error",
-                    "census_geolookup_error": str(error),
-                }
-            cache_changed = True
-        records.append(cache[cache_key])
+        if cache_key in cache:
+            records_by_index[index] = cache[cache_key]
+        else:
+            lookup_requests.append((index, cache_key, latitude, longitude))
 
-    if cache_path and cache_changed:
-        _write_public_report_census_geography_cache(cache_path, cache)
-    return pd.DataFrame(records, index=frame.index)
+    if progress_label:
+        print(
+            f"{progress_label}: {len(records_by_index)}/{len(frame)} records available before fetch; "
+            f"{len(lookup_requests)} to fetch",
+            flush=True,
+        )
+
+    def fetch_lookup(request):
+        index, cache_key, latitude, longitude = request
+        try:
+            record = _fetch_public_report_census_geography(
+                latitude,
+                longitude,
+                timeout=timeout,
+            )
+        except (json.JSONDecodeError, KeyError, OSError, TimeoutError, urllib.error.URLError) as error:
+            record = {
+                **_extract_public_report_census_geography_record(None),
+                "census_geolookup_status": "error",
+                "census_geolookup_error": str(error),
+            }
+        return index, cache_key, record
+
+    completed_fetches = 0
+    if lookup_requests:
+        worker_count = max(1, min(int(max_workers), len(lookup_requests)))
+        with ThreadPoolExecutor(max_workers=worker_count) as executor:
+            future_map = {
+                executor.submit(fetch_lookup, request): request
+                for request in lookup_requests
+            }
+            for future in as_completed(future_map):
+                index, cache_key, record = future.result()
+                cache[cache_key] = record
+                records_by_index[index] = record
+                completed_fetches += 1
+                if cache_path and (
+                    completed_fetches % int(cache_write_interval) == 0
+                    or completed_fetches == len(lookup_requests)
+                ):
+                    _write_public_report_census_geography_cache(cache_path, cache)
+                if progress_label and (
+                    completed_fetches % int(progress_interval) == 0
+                    or completed_fetches == len(lookup_requests)
+                ):
+                    print(
+                        f"{progress_label}: fetched {completed_fetches}/{len(lookup_requests)}; "
+                        f"total ready {len(records_by_index)}/{len(frame)}",
+                        flush=True,
+                    )
+
+    return pd.DataFrame([records_by_index[index] for index in frame.index], index=frame.index)
 
 
 def _coerce_public_report_census_geography_frame(census_geographies, index):
@@ -7705,6 +7752,7 @@ def _write_public_report_bundle_grid_surfaces(repo_root, output_dir, use_census_
         census_geographies = _fetch_public_report_census_geographies(
             suitability_base,
             cache_path=output_dir / "public_report_census_geography_cache.json",
+            progress_label="Census GeoLookup",
         )
     suitability = _annotate_public_report_cell_names(
         suitability_base,
