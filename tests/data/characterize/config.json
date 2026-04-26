@@ -1,0 +1,88 @@
+{
+  "data_dir": "",
+  "grid": "",
+  "characterizations": {
+    "generator_count": {
+      "dset": "vectors/generators.gpkg",
+      "method": "feature count",
+      "parallel": false
+    },
+    "generator_mwh": {
+      "dset": "vectors/generators.gpkg",
+      "method": "sum attribute",
+      "attribute": "net_generation_megawatthours",
+      "parallel": false
+    },
+    "generator_low_cf_mwh": {
+      "dset": "vectors/generators.gpkg",
+      "method": "sum attribute",
+      "attribute": "net_generation_megawatthours",
+      "where": "capacity_factor < 0.5",
+      "parallel": false
+    },
+    "tline_length": {
+      "dset": "vectors/tlines.gpkg",
+      "method": "sum length",
+      "parallel": false
+    },
+    "tline_voltage_length": {
+      "dset": "vectors/tlines.gpkg",
+      "method": "sum attribute-length",
+      "attribute": "VOLTAGE",
+      "parallel": false
+    },
+    "fttp_coverage_area": {
+      "dset": "vectors/fiber_to_the_premises.gpkg",
+      "method": "sum area",
+      "parallel": false
+    },
+    "fttp_average_speed": {
+      "dset": "vectors/fiber_to_the_premises.gpkg",
+      "method": "area-weighted average",
+      "attribute": "max_advertised_upload_speed",
+      "parallel": false
+    },
+    "fttp_coverage_pct": {
+      "dset": "vectors/fiber_to_the_premises.gpkg",
+      "method": "percent covered",
+      "parallel": false
+    },
+    "fttp_sum_speed": {
+      "dset": "vectors/fiber_to_the_premises.gpkg",
+      "method": "area-apportioned sum",
+      "attribute": "max_advertised_upload_speed",
+      "parallel": false
+    },
+    "avg_dist_to_lh_fiber": {
+      "dset": "rasters/fiber_lines_onshore_proximity.tif",
+      "method": "mean",
+      "weights_dset": "rasters/developable.tif",
+      "parallel": false
+    },
+    "med_dist_to_lh_fiber": {
+      "dset": "rasters/fiber_lines_onshore_proximity.tif",
+      "method": "median",
+      "parallel": true,
+      "max_workers": 4
+    },
+    "sum_dist_to_lh_fiber": {
+      "dset": "rasters/fiber_lines_onshore_proximity.tif",
+      "method": "sum",
+      "parallel": false
+    },
+    "fiber_availability_area": {
+      "dset": "rasters/fiber_availability_binary.tif",
+      "method": "area",
+      "weights_dset": "rasters/developable.tif",
+      "parallel": false
+    },
+    "developable_area": {
+      "dset": "rasters/developable.tif",
+      "method": "area",
+      "parallel": false
+    }
+  },
+  "expressions": {
+    "developable_capacity": "developable_area * 10"
+  }
+}

@@ -1,0 +1,53 @@
+{
+  "workflow": "run-public-report-bundle",
+  "repo_root": "/Users/tedtschopp/Developer/reVeal",
+  "completed": true,
+  "completed_steps": [
+    "run_public_reproduction",
+    "write_grid_surfaces",
+    "write_cumulative_buildout",
+    "write_assumption_registry",
+    "write_limitations_note",
+    "write_reeds_integration_contract",
+    "write_bundle_manifest",
+    "write_bundle_deviations"
+  ],
+  "stopped_at_step": null,
+  "step_results": {
+    "run_public_reproduction": "external-data/derived/report-bundle/public_reproduction_status.json",
+    "write_grid_surfaces": {
+      "outputs": [
+        "external-data/derived/report-bundle/public_report_feasible_land.gpkg",
+        "external-data/derived/report-bundle/public_report_suitability_percentiles.gpkg",
+        "external-data/derived/report-bundle/public_report_suitability_ranked_cells.csv",
+        "external-data/derived/report-bundle/public_report_state_boundaries.gpkg",
+        "external-data/derived/report-bundle/public_report_zoning_proxy.gpkg",
+        "external-data/derived/report-bundle/public_report_hosting_capacity_proxy.gpkg",
+        "external-data/derived/report-bundle/public_report_suitability_map.html"
+      ]
+    },
+    "write_cumulative_buildout": {
+      "outputs": [
+        "external-data/derived/report-bundle/public_eer_total_downscaled_cumulative_buildout.gpkg",
+        "external-data/derived/report-bundle/public_eer_regional_downscaled_cumulative_buildout.gpkg",
+        "external-data/derived/report-bundle/public_report_bundle_cumulative_buildout_summary.csv"
+      ]
+    },
+    "write_assumption_registry": "external-data/derived/report-bundle/public_report_assumption_registry.json",
+    "write_limitations_note": "external-data/derived/report-bundle/public_report_limitations.md",
+    "write_reeds_integration_contract": "external-data/derived/report-bundle/public_report_reeds_integration_contract.json",
+    "write_bundle_manifest": "external-data/derived/report-bundle/public_report_bundle_manifest.json",
+    "write_bundle_deviations": "external-data/derived/report-bundle/public_report_bundle_deviations.md"
+  },
+  "step_order": [
+    "run_public_reproduction",
+    "write_grid_surfaces",
+    "write_cumulative_buildout",
+    "write_assumption_registry",
+    "write_limitations_note",
+    "write_reeds_integration_contract",
+    "write_bundle_manifest",
+    "write_bundle_deviations"
+  ],
+  "total_steps": 8
+}

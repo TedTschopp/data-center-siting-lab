@@ -1,0 +1,220 @@
+[build-system]
+requires = [
+  "setuptools >= 80",
+  "setuptools_scm[toml] >= 8",
+]
+build-backend = 'setuptools.build_meta'
+
+[project]
+name = "NLR-reVeal"
+dynamic = ["version"]
+description = "The reV Extension for Analyzing Large Loads."
+readme = "README.rst"
+authors = [
+  {name = "Michael Gleason", email = "mike.gleason@nlr.gov"},
+]
+maintainers = [
+  {name = "Pavlo Pinchuk", email = "ppinchuk@nlr.gov"},
+]
+license = "BSD-3-Clause"
+keywords = ["reVeal", "NLR", "Load Analysis", "Geospatial", "Site-Suitability"]
+requires-python = ">= 3.12"
+classifiers = [
+  "Development Status :: 4 - Beta",
+  "Intended Audience :: Science/Research",
+  "Natural Language :: English",
+  "Operating System :: OS Independent",
+  "Programming Language :: Python :: 3",
+  "Programming Language :: Python :: 3.12",
+  "Programming Language :: Python :: 3.13",
+  "Topic :: Software Development :: Libraries :: Application Frameworks",
+]
+dependencies = [
+  "exactextract>=0.3.0,<0.4",
+  "geopandas>=1.1.1,<2",
+  "gdal>=3.10.3,<4",
+  "libpysal>=4.13.0,<5",
+  "NLR-GAPs>=0.9.1,<1",
+  "NLR-rex>=0.5.0,<1",
+  "pandas>=2.3.3,<3",
+  "pyarrow>=22.0.0,<23",
+  "pydantic>=2.12.5,<3",
+  "pyogrio>=0.12.1,<0.13",
+  "rasterio>=1.4.4,<2",
+  "tqdm>=4.67.1,<5",
+]
+
+[project.optional-dependencies]
+dev = [
+  "jupyter>=1.0.0,<1.1",
+  "pipreqs>=0.4.13,<0.5",
+  "ruff>=0.14.5,<0.15",
+  "ruff-lsp>=0.0.62,<0.0.63",
+]
+test = [
+  "flaky>=3.8.1,<4",
+  "pytest>=9.0.1,<10",
+  "pytest-cases>=3.9.1,<4",
+  "pytest-cov>=7.0.0,<8",
+  "pytest-mock>=3.15.1,<4",
+  "pytest-profiling>=1.8.1,<2",
+  "pytest-xdist>=3.8.0,<4",
+  "snakeviz>=2.2.2,<3",
+  "tox>=4.32.0,<5",
+]
+doc = [
+  "ghp-import>=2.1.0,<3",
+  "pydata-sphinx-theme>=0.16.1,<0.17",
+  "sphinx-click>=6.0.0,<7",
+  "sphinx-copybutton>=0.5.2,<0.6",
+  "sphinx-tabs>=3.4.1,<4",
+  "sphinxcontrib-mermaid>=1.0.0,<2",
+]
+build = [
+  "build>=1.2.2,<2",
+  "pkginfo>=1.12.1.2,<2",
+]
+
+[project.scripts]
+reVeal = "reVeal.cli.cli:main"
+
+[project.urls]
+homepage = "https://github.com/NatLabRockies/reVeal"
+documentation = "https://natlabrockies.github.io/reVeal/"
+repository = "https://github.com/NatLabRockies/reVeal"
+
+
+[tool.setuptools.packages]
+find = { include = ["reV*"] }
+
+[tool.setuptools_scm]
+fallback_version = "9999"
+version_file = "reVeal/_version.py"
+
+
+[tool.pixi.workspace]
+name = "reVeal"
+channels = ["conda-forge"]
+platforms = ["osx-arm64", "linux-64", "linux-aarch64", "win-64"]
+
+[tool.pixi.environments]
+default = { solve-group = "default" }
+dev = { features = ["dev", "doc", "test"], solve-group = "default" }
+doc = { features = ["doc"], solve-group = "default" }
+test = { features = ["test"], solve-group = "default" }
+build = { features = ["build"], solve-group = "default" }
+
+[tool.pixi.feature.dev.tasks]
+lint = "ruff check ./reVeal"
+format = "ruff format ./reVeal"
+tests = "pytest --durations=20 -rapP -vv --cov=reVeal --cov-report=html --cov-branch --cov-report=xml:coverage.xml --cov-fail-under=80 tests/"
+
+[tool.pixi.feature.doc.tasks]
+python-docs = { cmd = "make html", cwd = "docs" }  #  env = { SPHINXOPTS = "--fail-on-warning --keep-going --nitpicky" }}
+
+[tool.pixi.feature.build.tasks]
+build-wheels = { cmd = "uv build --sdist --wheel --out-dir dist/ ." }
+
+[tool.pixi.dependencies]
+exactextract = ">=0.3.0,<0.4"
+geopandas = ">=1.1.1,<2"
+gdal = ">=3.10.3,<4"
+libpysal = ">=4.13.0,<5"
+pandas = ">=2.3.3,<3"
+proj-data = ">=1.24,<2"
+pyarrow = ">=22.0.0,<23"
+pydantic = ">=2.12.5,<3"
+pyogrio = ">=0.12.1,<0.13"
+rasterio = ">=1.4.4,<2"
+tqdm = ">=4.67.1,<5"
+
+[tool.pixi.pypi-dependencies]
+NLR-reVeal = { path = ".", editable = true }
+
+[tool.pixi.feature.dev.dependencies]
+ipython = ">=8.29.0,<9"
+ruff = ">=0.14.5,<0.15"
+
+[tool.pixi.feature.test.dependencies]
+flaky = ">=3.8.1,<4"
+pytest = ">=9.0.1,<10"
+pytest-cases = ">=3.9.1,<4"
+pytest-cov = ">=7.0.0,<8"
+pytest-mock = ">=3.15.1,<4"
+pytest-profiling = ">=1.8.1,<2"
+pytest-xdist = ">=3.8.0,<4"
+snakeviz = ">=2.2.2,<3"
+tox = ">=4.32.0,<5"
+
+[tool.pixi.feature.doc.dependencies]
+ghp-import = ">=2.1.0,<3"
+make = ">=4.4.1,<5"
+myst-parser = ">=4.0.0,<5"
+nbconvert = ">=7.16.6,<8"
+pandoc = ">=3.6.4,<4"
+pydata-sphinx-theme = ">=0.16.1,<0.17"
+sphinx = ">=7.2"
+sphinx-click = ">=6.1.0,<7"
+sphinx-copybutton = ">=0.5.2,<0.6"
+sphinx-tabs = ">=3.4.1,<4"
+# sphinx-inline-tabs = ">=2023.4.21,<2024"
+sphinxcontrib-mermaid = ">=1.0.0,<2"
+
+[tool.pixi.feature.build.dependencies]
+python-build = ">=1.3.0,<2"
+pkginfo = ">=1.12.1.2,<2"
+uv = ">=0.9.10,<0.10"
+
+
+[tool.coverage.report]
+# Regexes for lines to exclude from consideration
+exclude_also = [
+  # Have to re-enable the standard pragma
+  "pragma: no cover",
+
+  # Don't complain about missing debug-only code:
+  "if self\\.debug",
+
+  # Don't complain about repr methods
+  "def __repr__",
+  "def _repr_markdown_",
+
+  # Don't complain about data I/O code
+  "def load*",
+  "def _load*",
+
+  # Don't complain if tests don't hit defensive assertion code:
+  "raise AssertionError",
+  "raise NotImplementedError",
+
+  # Don't complain if non-runnable code isn't run:
+  "if __name__ == .__main__.:",
+
+  # Don't complain about abstract methods, they aren't run:
+  "@(abc\\.)?abstractmethod",
+
+  # Don't complain about logging debugging functions
+  "def print_logging_info*",
+  "def __cls_name",
+]
+
+omit = [
+  # omit test files
+  "tests/*",
+  # omit init files
+  "__init__.py",
+  # omit version file
+  "_version.py",
+  # omit log file copied over from other repo
+  "reVeal/log.py",
+  # omit pixi files
+  ".pixi/*",
+]
+
+
+[tool.pytest.ini_options]
+addopts = "--disable-warnings"
+testpaths = [
+  "tests"
+]
+markers = "skip_ci: marks test as one that should not be run on GitHub Workflows"

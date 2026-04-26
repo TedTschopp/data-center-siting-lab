@@ -1,0 +1,43 @@
+{
+  "bundle_type": "bounded-public-report-bundle",
+  "workflow": "run-public-report-bundle",
+  "repo_root": "/Users/tedtschopp/Developer/reVeal",
+  "output_dir": "external-data/derived/report-bundle",
+  "bundle_status_path": "external-data/derived/report-bundle/public_report_bundle_status.json",
+  "reproduction_status_path": "external-data/derived/report-bundle/public_reproduction_status.json",
+  "deviation_path": "external-data/derived/report-bundle/public_report_bundle_deviations.md",
+  "baseline_year": 2022,
+  "report_baseline_year": 2025,
+  "grid_path": "/Users/tedtschopp/Developer/reVeal/tests/data/downscale/inputs/grid_char_weighted_scores.gpkg",
+  "grid_priority": "suitability_score",
+  "completed_steps": [
+    "assess_eer_drop_in",
+    "generate_eer_loads",
+    "total_smoke",
+    "regional_smoke",
+    "generate_nerc_features"
+  ],
+  "output_paths": [
+    "/Users/tedtschopp/Developer/reVeal/external-data/derived/eer/downscale-smoke/public_eer_regional_downscaled.gpkg",
+    "/Users/tedtschopp/Developer/reVeal/external-data/derived/eer/downscale-smoke/public_eer_total_downscaled.gpkg",
+    "/Users/tedtschopp/Developer/reVeal/external-data/derived/eer/eer_public_central_high_data_center_national.csv",
+    "/Users/tedtschopp/Developer/reVeal/external-data/derived/eer/eer_public_central_high_data_center_region_groups.csv",
+    "/Users/tedtschopp/Developer/reVeal/external-data/derived/eer/eer_public_central_high_data_center_regional.csv",
+    "/Users/tedtschopp/Developer/reVeal/external-data/derived/nerc/nerc_ltra_2025_assessment_area_margins.csv",
+    "/Users/tedtschopp/Developer/reVeal/external-data/derived/nerc/nerc_ltra_2025_emm_zone_margins.gpkg",
+    "/Users/tedtschopp/Developer/reVeal/external-data/derived/nerc/nerc_ltra_2025_grid_margins.gpkg",
+    "external-data/derived/report-bundle/public_eer_regional_downscaled_cumulative_buildout.gpkg",
+    "external-data/derived/report-bundle/public_eer_total_downscaled_cumulative_buildout.gpkg",
+    "external-data/derived/report-bundle/public_report_assumption_registry.json",
+    "external-data/derived/report-bundle/public_report_bundle_cumulative_buildout_summary.csv",
+    "external-data/derived/report-bundle/public_report_feasible_land.gpkg",
+    "external-data/derived/report-bundle/public_report_hosting_capacity_proxy.gpkg",
+    "external-data/derived/report-bundle/public_report_limitations.md",
+    "external-data/derived/report-bundle/public_report_reeds_integration_contract.json",
+    "external-data/derived/report-bundle/public_report_state_boundaries.gpkg",
+    "external-data/derived/report-bundle/public_report_suitability_map.html",
+    "external-data/derived/report-bundle/public_report_suitability_percentiles.gpkg",
+    "external-data/derived/report-bundle/public_report_suitability_ranked_cells.csv",
+    "external-data/derived/report-bundle/public_report_zoning_proxy.gpkg"
+  ]
+}

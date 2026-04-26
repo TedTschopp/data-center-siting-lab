@@ -1,0 +1,44 @@
+name: Codecov
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+
+jobs:
+  run:
+    name: Codecov
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    steps:
+    - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd
+      with:
+        fetch-depth: 0
+        fetch-tags: true
+        persist-credentials: false
+
+    - uses: prefix-dev/setup-pixi@1b2de7f3351f171c8b4dfeb558c639cb58ed4ec0
+      with:
+        pixi-version: v0.62.2
+        locked: true
+        cache: true
+        cache-write: false
+        environments: dev
+
+    - name: Generate coverage report
+      run: |
+        pixi reinstall -e dev --locked NLR-reVeal
+        pixi run -e dev --locked tests
+
+    - name: Upload coverage to Codecov
+      uses: codecov/codecov-action@57e3a136b779b570ffcdbf80b3bdc90e7fab3de2
+      with:
+        token: ${{ secrets.CODECOV_TOKEN }}
+        files: ./coverage.xml
+        flags: unittests
+        env_vars: OS,PYTHON
+        name: codecov-umbrella
+        fail_ci_if_error: false
+        verbose: true

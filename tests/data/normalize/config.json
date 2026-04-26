@@ -1,0 +1,55 @@
+{
+  "grid": "",
+  "attributes": {
+    "generator_count_score": {
+      "attribute": "generator_count",
+      "normalize_method": "percentile"
+    },
+    "generator_mwh_score": {
+      "attribute": "generator_mwh",
+      "normalize_method": "percentile"
+    },
+    "generator_low_cf_mwh_score": {
+      "attribute": "generator_low_cf_mwh",
+      "normalize_method": "percentile"
+    },
+    "tline_length_score": {
+      "attribute": "tline_length",
+      "normalize_method": "percentile"
+    },
+    "tline_voltage_length_score": {
+      "attribute": "tline_voltage_length",
+      "normalize_method": "percentile"
+    },
+    "fttp_coverage_area_score": {
+      "attribute": "fttp_coverage_area",
+      "normalize_method": "percentile"
+    },
+    "fttp_average_speed_score": {
+      "attribute": "fttp_average_speed",
+      "normalize_method": "percentile"
+    },
+    "fttp_coverage_pct_score": {
+      "attribute": "fttp_coverage_pct",
+      "normalize_method": "percentile"
+    },
+    "fttp_sum_speed_score": {
+      "attribute": "fttp_sum_speed",
+      "normalize_method": "percentile"
+    },
+    "fiber_availability_area_score": {
+      "attribute": "fiber_availability_area",
+      "normalize_method": "percentile"
+    },
+    "developable_area_score": {
+      "attribute": "developable_area",
+      "normalize_method": "percentile"
+    },
+    "developable_capacity_score": {
+      "attribute": "developable_capacity",
+      "normalize_method": "percentile"
+    }
+  },
+  "normalize_method": "minmax",
+  "invert": true
+}

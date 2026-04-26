@@ -1,0 +1,84 @@
+{
+  "workflow": "run-public-example-workflows",
+  "repo_root": "/Users/tedtschopp/Developer/reVeal",
+  "completed": true,
+  "completed_steps": [
+    "public_data_center_baseline",
+    "public_power_infrastructure_baseline",
+    "public_fiber_proxy_baseline",
+    "public_gas_service_territory_baseline",
+    "public_land_value_proxy",
+    "public_construction_cost_proxy",
+    "public_water_availability_proxy"
+  ],
+  "stopped_at_step": null,
+  "step_results": {
+    "public_data_center_baseline": {
+      "bundle_id": "public_data_center_baseline",
+      "bundle_dir": "/Users/tedtschopp/Developer/reVeal/external-data/examples/public_data_center_baseline",
+      "outputs": [
+        "/Users/tedtschopp/Developer/reVeal/external-data/examples/public_data_center_baseline/output/public_data_center_baseline.csv",
+        "/Users/tedtschopp/Developer/reVeal/external-data/examples/public_data_center_baseline/output/public_data_center_baseline.gpkg"
+      ]
+    },
+    "public_power_infrastructure_baseline": {
+      "bundle_id": "public_power_infrastructure_baseline",
+      "bundle_dir": "/Users/tedtschopp/Developer/reVeal/external-data/examples/public_power_infrastructure_baseline",
+      "outputs": [
+        "/Users/tedtschopp/Developer/reVeal/external-data/examples/public_power_infrastructure_baseline/output/public_transmission_lines_135kv.gpkg",
+        "/Users/tedtschopp/Developer/reVeal/external-data/examples/public_power_infrastructure_baseline/output/public_substations.gpkg"
+      ]
+    },
+    "public_fiber_proxy_baseline": {
+      "bundle_id": "public_fiber_proxy_baseline",
+      "bundle_dir": "/Users/tedtschopp/Developer/reVeal/external-data/examples/public_fiber_proxy_baseline",
+      "outputs": [
+        "/Users/tedtschopp/Developer/reVeal/external-data/examples/public_fiber_proxy_baseline/output/public_fiber_route_proxy.gpkg",
+        "/Users/tedtschopp/Developer/reVeal/external-data/examples/public_fiber_proxy_baseline/output/fiber_lines_onshore_proximity.tif",
+        "/Users/tedtschopp/Developer/reVeal/external-data/examples/public_fiber_proxy_baseline/output/fiber_availability_binary.tif"
+      ]
+    },
+    "public_gas_service_territory_baseline": {
+      "bundle_id": "public_gas_service_territory_baseline",
+      "bundle_dir": "/Users/tedtschopp/Developer/reVeal/external-data/examples/public_gas_service_territory_baseline",
+      "outputs": [
+        "/Users/tedtschopp/Developer/reVeal/external-data/examples/public_gas_service_territory_baseline/output/public_gas_service_territories.gpkg",
+        "/Users/tedtschopp/Developer/reVeal/external-data/examples/public_gas_service_territory_baseline/output/public_gas_service_territories_state_index.csv"
+      ]
+    },
+    "public_land_value_proxy": {
+      "bundle_id": "public_land_value_proxy",
+      "bundle_dir": "/Users/tedtschopp/Developer/reVeal/external-data/examples/public_land_value_proxy",
+      "outputs": [
+        "/Users/tedtschopp/Developer/reVeal/external-data/examples/public_land_value_proxy/output/public_land_value_county.gpkg",
+        "/Users/tedtschopp/Developer/reVeal/external-data/examples/public_land_value_proxy/output/public_land_value_emm_zone.gpkg"
+      ]
+    },
+    "public_construction_cost_proxy": {
+      "bundle_id": "public_construction_cost_proxy",
+      "bundle_dir": "/Users/tedtschopp/Developer/reVeal/external-data/examples/public_construction_cost_proxy",
+      "outputs": [
+        "/Users/tedtschopp/Developer/reVeal/external-data/examples/public_construction_cost_proxy/output/public_construction_cost_county.gpkg",
+        "/Users/tedtschopp/Developer/reVeal/external-data/examples/public_construction_cost_proxy/output/public_construction_cost_emm_zone.gpkg"
+      ]
+    },
+    "public_water_availability_proxy": {
+      "bundle_id": "public_water_availability_proxy",
+      "bundle_dir": "/Users/tedtschopp/Developer/reVeal/external-data/examples/public_water_availability_proxy",
+      "outputs": [
+        "/Users/tedtschopp/Developer/reVeal/external-data/examples/public_water_availability_proxy/output/public_water_availability_state_proxy.csv",
+        "/Users/tedtschopp/Developer/reVeal/external-data/examples/public_water_availability_proxy/output/public_water_availability_emm_zone.gpkg"
+      ]
+    }
+  },
+  "step_order": [
+    "public_data_center_baseline",
+    "public_power_infrastructure_baseline",
+    "public_fiber_proxy_baseline",
+    "public_gas_service_territory_baseline",
+    "public_land_value_proxy",
+    "public_construction_cost_proxy",
+    "public_water_availability_proxy"
+  ],
+  "total_steps": 7
+}

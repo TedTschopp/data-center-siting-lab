@@ -1,0 +1,189 @@
+{
+  "registry_type": "bounded-public-report-assumption-registry",
+  "bundle_label": "bounded-public-report-bundle",
+  "scenario_name": "CENTRAL HIGH DATA CENTER",
+  "bundle_mode": "bounded-public-approximation",
+  "report_reference": {
+    "baseline_year": 2025,
+    "grid_resolution_km": 5.76,
+    "utilization_factor": 0.88,
+    "initial_locations": "Baxtel 2025 operating data centers",
+    "max_site_addition_per_time_step_mw": 1000
+  },
+  "current_bundle": {
+    "baseline_year": 2022,
+    "grid_path": "/Users/tedtschopp/Developer/reVeal/tests/data/downscale/inputs/grid_char_weighted_scores.gpkg",
+    "grid_priority": "suitability_score",
+    "feasible_land_rule": "developable_capacity_mw > 0 and NLCD water/wetland share across classes 11, 90, and 95 < 0.5",
+    "suitability_percentile_rule": "percentile rank of suitability_score across feasible cells",
+    "ranked_summary_rule": "sort by suitability_percentile desc, suitability_score desc, developable_capacity_mw desc, sc_point_gid asc",
+    "output_dir": "external-data/derived/report-bundle"
+  },
+  "scenario_inputs": [
+    {
+      "output_label": "public_eer_total_downscaled",
+      "config_path": "/Users/tedtschopp/Developer/reVeal/external-data/derived/eer/config_public_total_smoke.json",
+      "projection_resolution": "total",
+      "load_projection_path": "external-data/derived/eer/eer_public_central_high_data_center_national.csv",
+      "load_value": "dc_load_mw",
+      "load_year": "year",
+      "grid_path": "tests/data/downscale/inputs/grid_char_weighted_scores.gpkg",
+      "grid_priority": "suitability_score",
+      "grid_baseline_load": "dc_capacity_mw_existing",
+      "grid_capacity": "developable_capacity_mw",
+      "baseline_year": 2022,
+      "max_site_addition_per_year_mw": 1000,
+      "site_saturation_limit": 0.5,
+      "priority_power": 100,
+      "n_bootstraps": 500,
+      "random_seed": 0
+    },
+    {
+      "output_label": "public_eer_regional_downscaled",
+      "config_path": "/Users/tedtschopp/Developer/reVeal/external-data/derived/eer/config_public_regional_smoke.json",
+      "projection_resolution": "regional",
+      "load_projection_path": "external-data/derived/eer/eer_public_central_high_data_center_region_groups.csv",
+      "load_value": "dc_load_mw",
+      "load_year": "year",
+      "grid_path": "tests/data/downscale/inputs/grid_char_weighted_scores.gpkg",
+      "grid_priority": "suitability_score",
+      "grid_baseline_load": "dc_capacity_mw_existing",
+      "grid_capacity": "developable_capacity_mw",
+      "baseline_year": 2022,
+      "max_site_addition_per_year_mw": 1000,
+      "site_saturation_limit": 0.5,
+      "priority_power": 100,
+      "n_bootstraps": 100,
+      "random_seed": 0,
+      "regions": "tests/data/downscale/inputs/regions/eer_adp_zones.gpkg",
+      "region_names": "zone_group",
+      "load_regions": "zone_group"
+    }
+  ],
+  "output_labels": [
+    {
+      "label": "public_report_feasible_land",
+      "path": "external-data/derived/report-bundle/public_report_feasible_land.gpkg",
+      "description": "bounded feasible-land approximation derived from execution-grid cells where developable_capacity_mw > 0 and NLCD water/wetland share across classes 11, 90, and 95 remains below 0.5"
+    },
+    {
+      "label": "public_report_suitability_percentiles",
+      "path": "external-data/derived/report-bundle/public_report_suitability_percentiles.gpkg",
+      "description": "bounded suitability-percentile surface derived from the pre-existing suitability_score field on feasible cells"
+    },
+    {
+      "label": "public_report_suitability_ranked_cells",
+      "path": "external-data/derived/report-bundle/public_report_suitability_ranked_cells.csv",
+      "description": "bounded nationwide ranked suitability table sorted by percentile, score, developable capacity, and stable cell identifier"
+    },
+    {
+      "label": "public_report_state_boundaries",
+      "path": "external-data/derived/report-bundle/public_report_state_boundaries.gpkg",
+      "description": "derived Census state-boundary layer reprojected into the bounded map CRS for transparent contextual overlay"
+    },
+    {
+      "label": "public_report_hosting_capacity_proxy",
+      "path": "external-data/derived/report-bundle/public_report_hosting_capacity_proxy.gpkg",
+      "description": "bounded regional hosting-capacity proxy derived from NERC reserve-margin headroom and transferred onto the execution-grid cells"
+    },
+    {
+      "label": "public_report_zoning_proxy",
+      "path": "external-data/derived/report-bundle/public_report_zoning_proxy.gpkg",
+      "description": "bounded zoning proxy derived from NLCD developed-land context sampled onto the execution-grid cells"
+    },
+    {
+      "label": "public_report_suitability_map",
+      "path": "external-data/derived/report-bundle/public_report_suitability_map.html",
+      "description": "single-page D3 map of the bounded suitability-percentile surface for quick visual review"
+    },
+    {
+      "label": "public_report_limitations",
+      "path": "external-data/derived/report-bundle/public_report_limitations.md",
+      "description": "limitations and refinement carry-forward note for the current bounded public report surface"
+    },
+    {
+      "label": "public_report_reeds_integration_contract",
+      "path": "external-data/derived/report-bundle/public_report_reeds_integration_contract.json",
+      "description": "machine-readable handoff contract for ReEDS-facing use of the bounded public report bundle"
+    },
+    {
+      "label": "public_eer_total_downscaled_cumulative_buildout",
+      "path": "external-data/derived/report-bundle/public_eer_total_downscaled_cumulative_buildout.gpkg",
+      "description": "bounded cumulative buildout approximation derived from the total smoke output"
+    },
+    {
+      "label": "public_eer_regional_downscaled_cumulative_buildout",
+      "path": "external-data/derived/report-bundle/public_eer_regional_downscaled_cumulative_buildout.gpkg",
+      "description": "bounded cumulative buildout approximation derived from the grouped regional smoke output"
+    },
+    {
+      "label": "public_report_bundle_cumulative_buildout_summary",
+      "path": "external-data/derived/report-bundle/public_report_bundle_cumulative_buildout_summary.csv",
+      "description": "year-by-year cumulative buildout summary for the bounded bundle outputs"
+    }
+  ],
+  "limitation_carry_forward": [
+    {
+      "name": "local_transmission_hosting_capacity",
+      "title": "Local transmission hosting capacity",
+      "status": "bounded proxy",
+      "current_posture": "The current bundle stages a regional NERC reserve-margin headroom overlay as a coarse hosting-capacity proxy, but it still does not model local transmission hosting-capacity headroom.",
+      "output_implication": "The hosting overlay supports coarse regional screening only; it does not confirm local deliverability or interconnection feasibility."
+    },
+    {
+      "name": "demand_queue_times",
+      "title": "Demand queue times",
+      "status": "not implemented",
+      "current_posture": "The current bundle does not model interconnection queue wait times or developer queue backlog.",
+      "output_implication": "Report outputs do not imply deployment-ready timing or queue-adjusted build schedules."
+    },
+    {
+      "name": "zoning_information",
+      "title": "Zoning information",
+      "status": "bounded proxy",
+      "current_posture": "The current bundle stages an NLCD developed-land context overlay as a coarse zoning proxy, but it still does not model parcel-level zoning or allowed land uses.",
+      "output_implication": "The zoning overlay supports coarse developed-context screening only; it does not confirm parcel-level zoning approval or data-center entitlement."
+    },
+    {
+      "name": "permitting_and_ordinance_information",
+      "title": "Permitting and ordinance information",
+      "status": "not implemented",
+      "current_posture": "The current bundle does not model local permitting pathways or ordinance restrictions.",
+      "output_implication": "Report outputs do not imply permit readiness or ordinance compatibility."
+    },
+    {
+      "name": "capacity_scaling_by_market_trends",
+      "title": "More representative capacity scaling by market trends",
+      "status": "bounded approximation",
+      "current_posture": "The current bundle uses public EER scenario inputs and smoke-config site-addition limits rather than market-specific capacity scaling.",
+      "output_implication": "Cumulative buildout outputs are screening artifacts, not market-calibrated deployment forecasts."
+    },
+    {
+      "name": "social_acceptance",
+      "title": "Social acceptance",
+      "status": "not implemented",
+      "current_posture": "The current bundle does not model community acceptance, local opposition, or related siting friction.",
+      "output_implication": "Ranked outputs do not account for local acceptance risk."
+    }
+  ],
+  "assumption_gaps": [
+    {
+      "name": "report_reference_utilization_factor",
+      "report_reference_value": 0.88,
+      "current_bundle_value": null,
+      "status": "not-explicitly-modeled-in-current-bundle"
+    },
+    {
+      "name": "report_reference_initial_locations",
+      "report_reference_value": "Baxtel 2025 operating data centers",
+      "current_bundle_value": "execution-grid baseline field dc_capacity_mw_existing with 2022 baseline year",
+      "status": "bounded-approximation"
+    },
+    {
+      "name": "report_reference_grid_resolution_km",
+      "report_reference_value": 5.76,
+      "current_bundle_value": "/Users/tedtschopp/Developer/reVeal/tests/data/downscale/inputs/grid_char_weighted_scores.gpkg",
+      "status": "fixture-grid-approximation"
+    }
+  ]
+}

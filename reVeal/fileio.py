@@ -1,0 +1,350 @@
+# -*- coding: utf-8 -*-
+"""
+io module
+"""
+from pathlib import Path
+
+import pyogrio
+import rasterio
+import pyproj
+import geopandas as gpd
+from geopandas.io.arrow import (
+    _read_parquet_schema_and_metadata,
+    _validate_and_decode_metadata,
+)
+from pyogrio._ogr import _get_drivers_for_path
+from pandas.api.types import is_numeric_dtype
+import numpy as np
+import pandas as pd
+
+
+GEOMETRY_TYPES = {
+    "Point": "point",
+    "Polygon": "polygon",
+    "LineString": "line",
+    "MultiPolygon": "polygon",
+    "MultiLineString": "line",
+}
+
+
+def get_geom_info_parquet(dset_src):
+    """
+    Reads geometry information from geoparquet file.
+
+    Parameters
+    ----------
+    dset_src : str
+        Path to GeoParquet file.
+
+    Returns
+    -------
+    dict
+        Returns a dictionary of geometry information from parquet file.
+    """
+    _, metadata = _read_parquet_schema_and_metadata(dset_src, None)
+    geo_metadata = _validate_and_decode_metadata(metadata)
+    geom_col = geo_metadata["primary_column"]
+    geom_col_info = geo_metadata["columns"][geom_col]
+
+    return geom_col_info
+
+
+def get_geom_type_parquet(dset_src):
+    """
+    Determine the generic geometry type of an input GeoParquet dataset.
+
+    Parameters
+    ----------
+    dset_src : str
+        Path to input GeoParquet dataset.
+
+    Returns
+    -------
+    str
+        Geometry type. One of: "point", "line", or "polygon"."
+
+    Raises
+    ------
+    ValueError
+        A ValueError will be raised if any of the following issues are encountered:
+        - The geometry type cannot be parsed from the schema of the input file
+        - There are multiple geometry types in the input file
+        - The input geometry type is not a valid/supported option.
+    """
+    geom_col_info = get_geom_info_parquet(dset_src)
+    in_geom_types = geom_col_info.get("geometry_types")
+    geom_types = []
+    for in_geom_type in in_geom_types:
+        std_geom_type = GEOMETRY_TYPES.get(in_geom_type)
+        if std_geom_type is None:
+            raise ValueError(
+                f"Unsupported geometry type: {in_geom_type}."
+                f"Supported options are: {GEOMETRY_TYPES.keys()}"
+            )
+        geom_types.append(std_geom_type)
+    if len(set(geom_types)) > 1:
+        raise ValueError(
+            f"Multiple geometry types encountered in {dset_src}: {geom_types}."
+        )
+
+    return geom_types[0]
+
+
+def get_geom_type_pyogrio(dset_src):
+    """
+    Determine the generic geometry type of of an input vector dataset that can be read
+    by pyogrio.
+
+    Parameters
+    ----------
+    dset_src : str
+        Path to input vector dataset.
+
+    Returns
+    -------
+    str
+        Geometry type. One of: "point", "line", or "polygon"."
+
+    Raises
+    ------
+    ValueError
+        A ValueError will be raised if the input dataset is not one of the known
+        formats.
+    """
+    dset_info = pyogrio.read_info(dset_src)
+    geom_type = GEOMETRY_TYPES.get(dset_info["geometry_type"])
+    if geom_type is None:
+        raise ValueError(
+            f"Unsupported geometry type: {dset_info['geometry_type']}."
+            f"Supported options are: {GEOMETRY_TYPES.keys()}"
+        )
+
+    return geom_type
+
+
+def get_attributes_parquet(dset_src):
+    """
+    Get the attributes and their corresponding data types from an input GeoParquet
+    dataset.
+
+    Parameters
+    ----------
+    dset_src : str
+        Path to vector dataset.
+
+    Returns
+    -------
+    dict
+        Dictionary with keys indicating attribute names and values indicating their
+        corresponding datatypes.
+    """
+    schema, metadata = _read_parquet_schema_and_metadata(dset_src, None)
+    geo_metadata = _validate_and_decode_metadata(metadata)
+    geom_col = geo_metadata["primary_column"]
+
+    attributes = {}
+    for name, dtype in zip(schema.names, schema.types):
+        if name in [geom_col, "bbox"]:
+            continue
+        try:
+            pd_dtype = dtype.to_pandas_dtype()
+        except NotImplementedError:
+            pd_dtype = np.object_
+        attributes[name] = pd_dtype
+
+    return attributes
+
+
+def get_attributes_pyogrio(dset_src):
+    """
+    Get the attributes and their corresponding data types from a vector dataset that
+    can be opened with pyogrio.
+
+    Parameters
+    ----------
+    dset_src : str
+        Path to vector dataset.
+
+    Returns
+    -------
+    dict
+        Dictionary with keys indicating attribute names and values indicating their
+        corresponding datatypes.
+    """
+    dset_info = pyogrio.read_info(dset_src)
+    dtypes = [np.dtype(t).type for t in dset_info["dtypes"]]
+    attributes = dict(zip(dset_info["fields"], dtypes))
+
+    return attributes
+
+
+def get_crs_raster(dset_src):
+    """
+    Get the coordinate reference system of a raster dataset.
+
+    Parameters
+    ----------
+    dset_src : str
+        Path to dataset.
+
+    Returns
+    -------
+    str
+        CRS as an EPSG code.
+    """
+    with rasterio.open(dset_src, "r") as src:
+        crs = src.crs
+
+    authority_code = ":".join(crs.to_authority())
+
+    return authority_code
+
+
+def get_crs_pyogrio(dset_src):
+    """
+    Get the coordinate reference system of a vector dataset that can be opened with
+    pyogrio.
+
+    Parameters
+    ----------
+    dset_src : str
+        Path to dataset.
+
+    Returns
+    -------
+    str
+        CRS as an EPSG code.
+    """
+    dset_info = pyogrio.read_info(dset_src)
+    authority_code = dset_info["crs"]
+    if authority_code is None:
+        raise ValueError(f"Could not determine CRS  for {dset_src})")
+
+    return authority_code
+
+
+def get_crs_parquet(dset_src):
+    """
+    Get the coordinate reference system of a GeoParquet dataset.
+
+    Parameters
+    ----------
+    dset_src : str
+        Path to dataset.
+
+    Returns
+    -------
+    str
+        CRS as an EPSG code.
+    """
+    geom_col_info = get_geom_info_parquet(dset_src)
+    crs_info = geom_col_info.get("crs")
+    if crs_info is None:
+        raise ValueError(f"Could not determine CRS  for {dset_src})")
+    crs = pyproj.CRS.from_user_input(crs_info)
+    authority_code = ":".join(crs.to_authority())
+
+    return authority_code
+
+
+def read_vectors(vector_src, where=None, **kwargs):
+    """
+    Read vector dataset in GeoParquet or pyogrio-compatible format to GeoDataFrame.
+
+    Note that if kwargs are passed such that the geometry column is not read, the
+    returned object will be a DataFrame rather than GeoDataFrame.
+
+    Parameters
+    ----------
+    vector_src : str
+        Path to vector dataset.
+    where : str, optional
+        Optional query string to apply to the input vector_src to subset the features
+        included in the results. Should follow the format `expr` defined in
+        pandas.DataFrame.query.
+    **kwargs: dict
+        Additional keyword arguments passed on to GeoPandas read_parquet() or
+        read_file() methods.
+
+    Returns
+    -------
+    [geopandas.GeoDataFrame, pandas.DataFrame
+        Returns GeoDataFrame of vectors. If kwargs are passed such that the geometry
+        column is not read, the returned object will be a DataFrame rather than a
+        GeoDataFrame.
+
+    Raises
+    ------
+    IOError
+        An IOError will be raised if the input dataset is not a supported/recognized
+        vector data format.
+    """
+
+    if Path(vector_src).suffix == ".parquet":
+        if "columns" in kwargs and "geometry" not in kwargs["columns"]:
+            df = pd.read_parquet(vector_src, **kwargs)
+        else:
+            df = gpd.read_parquet(vector_src, **kwargs)
+    elif _get_drivers_for_path(vector_src):
+        if (
+            "columns" in kwargs
+            and "geometry" not in kwargs["columns"]
+            and "read_geometry" not in kwargs
+        ):
+            kwargs["read_geometry"] = False
+        df = gpd.read_file(vector_src, **kwargs)
+    else:
+        raise IOError(
+            f"Unable to read vectors from input file {vector_src}. "
+            "Not a recognized vector format."
+        )
+
+    if where:
+        sub_df = df.query(where, global_dict={}, local_dict={})
+        return sub_df
+
+    return df
+
+
+def attribute_is_numeric(vector_src, attribute):
+    """
+    Check that the specified attribute in the input vector dataset is a numeric
+    datatype.
+
+    Parameters
+    ----------
+    vector_src : str
+        Path to vector dataset.
+    attribute : str
+        Name of attribute.
+
+    Returns
+    -------
+    bool
+        Returns True if the attribute is numeric, False if not.
+
+    Raises
+    ------
+    IOError
+        An IOError will be raised if the input dataset is an unknown format (i.e., not
+        readable as either a GeoParquet or ogr-compatible format).
+    ValueError
+        A ValueError will be raised if the attribute is not present in the input
+        dataset.
+    """
+
+    if Path(vector_src).suffix == ".parquet":
+        dset_attributes = get_attributes_parquet(vector_src)
+    elif _get_drivers_for_path(vector_src):
+        dset_attributes = get_attributes_pyogrio(vector_src)
+    else:
+        raise IOError(
+            f"Unable to read input vector file {vector_src}. "
+            "Not a recognized vector format."
+        )
+
+    attr_dtype = dset_attributes.get(attribute)
+    if not attr_dtype:
+        raise ValueError(f"Attribute {attribute} not found in {vector_src}")
+
+    return is_numeric_dtype(attr_dtype)
