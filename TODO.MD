@@ -65,19 +65,21 @@ public-source approximation.
 Keep this section aligned with the open checklist below. When priorities or
 dependencies change, update this order in the same change.
 
-Current recommended next action: complete publication readiness. Review ownership,
-remote, package, documentation, citation, and release metadata before publishing the
-repository under a `TedTschopp` account. The numbered report-bundle blockers
+Current recommended next action: complete the final publication handoff for
+`TedTschopp/data-center-siting-lab`. The repository and distribution metadata now
+use the new name; the underlying `reVeal` module and CLI references remain where
+they describe the upstream modeling engine. The numbered report-bundle blockers
 currently listed below are complete.
 
 Immediate follow-up order:
 
 1. Run the publishing validation checklist in `PUBLISHING.md` and confirm generated
       report-bundle artifacts are not staged.
-2. Decide whether the published repository is a fork, a renamed derivative package,
-      or an internal analysis repository, then update metadata in one deliberate
-      change.
-3. If Baxtel access is later obtained, place the licensed/sample CSV at the tracked
+2. Confirm the Git remote and GitHub repository are set to
+      `TedTschopp/data-center-siting-lab` before pushing.
+3. Decide whether to publish wheels/source distributions under the renamed package
+      identity, or keep the repository as an analysis-only publication.
+4. If Baxtel access is later obtained, place the licensed/sample CSV at the tracked
       local path and rerun the Baxtel schema contract before revisiting trained
       suitability parity.
 

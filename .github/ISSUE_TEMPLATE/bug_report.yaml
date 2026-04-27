@@ -1,22 +1,22 @@
 name: Bug Report
-description: Notify the developers of anomalous or incorrect reVeal behavior
+description: Notify the developers of anomalous or incorrect data-center-siting-lab behavior
 type: Bug
 
 body:
   - type: checkboxes
     id: checks
     attributes:
-      label: reVeal version checks
+      label: data-center-siting-lab version checks
       options:
         - label: >
             I have confirmed this bug has not already been reported.
           required: true
         - label: >
             I have confirmed this bug exists on the
-            [latest version](https://github.com/NatLabRockies/reVeal/releases/latest) of reVeal.
+            [latest version](https://github.com/TedTschopp/data-center-siting-lab/releases/latest) of data-center-siting-lab.
           required: true
         - label: >
-            I have confirmed this bug exists on the main branch of reVeal.
+            I have confirmed this bug exists on the main branch of data-center-siting-lab.
   - type: textarea
     id: problem
     attributes:
@@ -60,7 +60,7 @@ body:
       value: |
         - OS: [e.g. OSX, Windows, Linux]
         - Compute hardware: [e.g. Kestrel, AWS]
-        - reVeal Version: [e.g. 0.12.1]
+        - data-center-siting-lab Version: [e.g. 0.1.0]
         - Python Version: [e.g. 3.13]
         - GeoPandas Version: [e.g. 2.1.0]
         ...
@@ -70,7 +70,7 @@ body:
   - type: checkboxes
     id: charge-code
     attributes:
-      label: Charge code
+      label: Prioritization
       options:
         - label: >
-            I am at NLR and am willing to provide a charge code to have this bug fixed urgently.
+            I can provide prioritization context for this bug.

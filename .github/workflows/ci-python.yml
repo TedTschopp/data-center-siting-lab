@@ -50,7 +50,7 @@ jobs:
         environments: dev
 
     - run: |
-        pixi reinstall -e dev --locked NLR-reVeal
+        pixi reinstall -e dev --locked data-center-siting-lab
 
   tests:
     # needs: lint
@@ -79,7 +79,7 @@ jobs:
         environments: dev
 
     - run: |
-        pixi reinstall -e dev NLR-reVeal
+        pixi reinstall -e dev data-center-siting-lab
         pixi run -e dev tests
 
   mamba-test:

@@ -1,5 +1,5 @@
 name: Feature Request
-description: Request a new reVeal feature
+description: Request a new data-center-siting-lab feature
 type: Feature
 
 body:
@@ -10,11 +10,11 @@ body:
       description: Please check what type of feature request you would like to propose.
       options:
         - label: >
-            Adding new functionality to reVeal
+            Adding new functionality to data-center-siting-lab
         - label: >
-            Changing existing functionality in reVeal
+            Changing existing functionality in data-center-siting-lab
         - label: >
-            Removing existing functionality in reVeal
+            Removing existing functionality in data-center-siting-lab
   - type: textarea
     id: description
     attributes:
@@ -23,7 +23,7 @@ body:
         Is your feature request related to a problem? Please describe.
       placeholder: |
         I'm always frustrated when [...]
-        I wish I could use reVeal to [...]
+        I wish I could use data-center-siting-lab to [...]
 
     validations:
       required: true
@@ -60,4 +60,4 @@ body:
       label: Charge code
       options:
         - label: >
-            I am at NLR and am willing to provide a charge code to have this feature added urgently.
+            I can provide prioritization context for this feature request.

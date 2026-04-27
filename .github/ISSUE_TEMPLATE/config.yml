@@ -1,8 +1,7 @@
 blank_issues_enabled: false
 contact_links:
   - name: Question
-    url: https://github.com/NatLabRockies/reV/discussions
+    url: https://github.com/TedTschopp/data-center-siting-lab/discussions
     about: |
-      Ask questions about the reV suite (including reVeal) and discuss with the developers and
-      other users here. If you have a question like "How do I calculate site-suitability scores?", please
+      Ask questions about data-center-siting-lab and discuss with the maintainers here. If you have a question like "How do I calculate site-suitability scores?", please
       include a self-contained reproducible example of what you have tried already, if possible.

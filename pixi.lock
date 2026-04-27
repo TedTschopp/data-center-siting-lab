@@ -9195,6 +9195,45 @@ packages:
   - pytest-xdist ; extra == 'test'
   - pre-commit ; extra == 'test'
   requires_python: '>=3.10'
+- pypi: ./
+  name: data-center-siting-lab
+  version: 10000.dev11+g389dde694.d20260427
+  sha256: 5fe82a4b812e8887ba8527894b981942e2570faf2e3a45401a52cc3c9bf6d2c1
+  requires_dist:
+  - exactextract>=0.3.0,<0.4
+  - geopandas>=1.1.1,<2
+  - gdal>=3.10.3,<4
+  - libpysal>=4.13.0,<5
+  - nlr-gaps>=0.9.1,<1
+  - nlr-rex>=0.5.0,<1
+  - pandas>=2.3.3,<3
+  - pyarrow>=22.0.0,<23
+  - pydantic>=2.12.5,<3
+  - pyogrio>=0.12.1,<0.13
+  - rasterio>=1.4.4,<2
+  - tqdm>=4.67.1,<5
+  - jupyter>=1.0.0,<1.1 ; extra == 'dev'
+  - pipreqs>=0.4.13,<0.5 ; extra == 'dev'
+  - ruff>=0.14.5,<0.15 ; extra == 'dev'
+  - ruff-lsp>=0.0.62,<0.0.63 ; extra == 'dev'
+  - flaky>=3.8.1,<4 ; extra == 'test'
+  - pytest>=9.0.1,<10 ; extra == 'test'
+  - pytest-cases>=3.9.1,<4 ; extra == 'test'
+  - pytest-cov>=7.0.0,<8 ; extra == 'test'
+  - pytest-mock>=3.15.1,<4 ; extra == 'test'
+  - pytest-profiling>=1.8.1,<2 ; extra == 'test'
+  - pytest-xdist>=3.8.0,<4 ; extra == 'test'
+  - snakeviz>=2.2.2,<3 ; extra == 'test'
+  - tox>=4.32.0,<5 ; extra == 'test'
+  - ghp-import>=2.1.0,<3 ; extra == 'doc'
+  - pydata-sphinx-theme>=0.16.1,<0.17 ; extra == 'doc'
+  - sphinx-click>=6.0.0,<7 ; extra == 'doc'
+  - sphinx-copybutton>=0.5.2,<0.6 ; extra == 'doc'
+  - sphinx-tabs>=3.4.1,<4 ; extra == 'doc'
+  - sphinxcontrib-mermaid>=1.0.0,<2 ; extra == 'doc'
+  - build>=1.2.2,<2 ; extra == 'build'
+  - pkginfo>=1.12.1.2,<2 ; extra == 'build'
+  requires_python: '>=3.12'
 - pypi: https://files.pythonhosted.org/packages/17/b8/bfdc30b6e94f1eff09f2dc9cc1f9cd1c6cde3d996bcbd36ce2d9a4956e99/debugpy-1.8.19-cp314-cp314-win_amd64.whl
   name: debugpy
   version: 1.8.19
@@ -16851,45 +16890,6 @@ packages:
   - pkginfo>=1.12.1.2,<2 ; extra == 'build'
   - twine>=6.1.0,<7 ; extra == 'build'
   requires_python: '>=3.9'
-- pypi: ./
-  name: nlr-reveal
-  version: 0.2.3.dev5+gcd9a349c7.d20260218
-  sha256: 2aae1db5c4132f29219a349a14eda01c3f21a6e2f5fe7aa4710b74d075766262
-  requires_dist:
-  - exactextract>=0.3.0,<0.4
-  - geopandas>=1.1.1,<2
-  - gdal>=3.10.3,<4
-  - libpysal>=4.13.0,<5
-  - nlr-gaps>=0.9.1,<1
-  - nlr-rex>=0.5.0,<1
-  - pandas>=2.3.3,<3
-  - pyarrow>=22.0.0,<23
-  - pydantic>=2.12.5,<3
-  - pyogrio>=0.12.1,<0.13
-  - rasterio>=1.4.4,<2
-  - tqdm>=4.67.1,<5
-  - jupyter>=1.0.0,<1.1 ; extra == 'dev'
-  - pipreqs>=0.4.13,<0.5 ; extra == 'dev'
-  - ruff>=0.14.5,<0.15 ; extra == 'dev'
-  - ruff-lsp>=0.0.62,<0.0.63 ; extra == 'dev'
-  - flaky>=3.8.1,<4 ; extra == 'test'
-  - pytest>=9.0.1,<10 ; extra == 'test'
-  - pytest-cases>=3.9.1,<4 ; extra == 'test'
-  - pytest-cov>=7.0.0,<8 ; extra == 'test'
-  - pytest-mock>=3.15.1,<4 ; extra == 'test'
-  - pytest-profiling>=1.8.1,<2 ; extra == 'test'
-  - pytest-xdist>=3.8.0,<4 ; extra == 'test'
-  - snakeviz>=2.2.2,<3 ; extra == 'test'
-  - tox>=4.32.0,<5 ; extra == 'test'
-  - ghp-import>=2.1.0,<3 ; extra == 'doc'
-  - pydata-sphinx-theme>=0.16.1,<0.17 ; extra == 'doc'
-  - sphinx-click>=6.0.0,<7 ; extra == 'doc'
-  - sphinx-copybutton>=0.5.2,<0.6 ; extra == 'doc'
-  - sphinx-tabs>=3.4.1,<4 ; extra == 'doc'
-  - sphinxcontrib-mermaid>=1.0.0,<2 ; extra == 'doc'
-  - build>=1.2.2,<2 ; extra == 'build'
-  - pkginfo>=1.12.1.2,<2 ; extra == 'build'
-  requires_python: '>=3.12'
 - pypi: https://files.pythonhosted.org/packages/0a/08/b83b94a2b10ee7d27dddff4812a188e6669e520dafccb590613a90fa9d76/nlr_rex-0.5.0-py3-none-any.whl
   name: nlr-rex
   version: 0.5.0

@@ -1,11 +1,11 @@
-# Publishing Checklist
+# data-center-siting-lab Publishing Checklist
 
 ## Bottom Line
 
-This repository can be published for coworker review once the documentation,
-validation checks, and metadata decisions below are complete. Keep the distinction
-clear: source code, tests, manifests, provenance, and documentation are versioned;
-large downloads and generated report-bundle payloads are not.
+This repository is now branded as `data-center-siting-lab` for publication under
+`TedTschopp/data-center-siting-lab`. Keep the distinction clear: source code,
+tests, manifests, provenance, and documentation are versioned; large downloads and
+generated report-bundle payloads are not.
 
 ## Source Vs Generated Policy
 
@@ -47,24 +47,25 @@ artifact, not source code.
 Run these before publishing or handing the repo to coworkers:
 
 ```bash
-micromamba run -p /Users/tedtschopp/micromamba/envs/reVeal make -C /Users/tedtschopp/Developer/reVeal/docs html
-micromamba run -p /Users/tedtschopp/micromamba/envs/reVeal python -m pytest tests/test_public_data.py::test_run_public_report_bundle_writes_manifest_and_deviation_note -q
+make -C docs html
+python -m pytest tests/test_public_data.py::test_run_public_report_bundle_writes_manifest_and_deviation_note -q
 uvx ruff check ./reVeal && git diff --check
 ```
 
 For a full confidence pass:
 
 ```bash
-micromamba run -p /Users/tedtschopp/micromamba/envs/reVeal python -m pytest -q
+python -m pytest -q
 ```
 
-## Metadata Review Before Publishing Under TedTschopp
+## Metadata Boundary
 
-The current repository metadata still points to upstream `NatLabRockies/reVeal` and
-the `NLR-reVeal` package identity. That is deliberate until the publishing model is
-explicit.
+Repository metadata now points to `TedTschopp/data-center-siting-lab`. The Python
+module and CLI command still use the upstream `reVeal` name because the lab builds
+on that modeling engine. Do not blindly replace those technical import and command
+surfaces.
 
-Before publishing under `TedTschopp`, decide whether this is:
+Before publishing a package to PyPI or another registry, decide whether this is:
 
 - A fork that preserves upstream package identity and attribution.
 - A renamed derivative package.
@@ -78,7 +79,7 @@ Review these files in one deliberate metadata change:
   links.
 - `CITATION.cff`: `repository-code`, release metadata, and citation expectations.
 - `docs/source/conf.py`: GitHub context owner/repo/version settings.
-- Git remotes and branch protection rules.
+- Git remotes and branch protection rules for `TedTschopp/data-center-siting-lab`.
 - Any GitHub release, documentation-hosting, or issue-template links introduced
   outside this checklist.
 
@@ -90,10 +91,9 @@ fork ownership and additions clear.
 
 - License: BSD-3-Clause.
 - Upstream project: `NatLabRockies/reVeal`.
-- Package identity unless intentionally renamed: `NLR-reVeal`.
-- Citation metadata in `CITATION.cff` unless a new derivative citation is created
-  with clear provenance.
-- Existing author and maintainer records unless the project governance changes.
+- Underlying module and CLI surface: `reVeal`.
+- Derivative repository and distribution identity: `data-center-siting-lab`.
+- Upstream authorship and citation context in `CITATION.cff`.
 
 ## Coworker Handoff Checklist
 
@@ -107,6 +107,7 @@ fork ownership and additions clear.
 - [ ] Read `external-data/provenance/data-center-bundle-deviations.md`.
 - [ ] Review `external-data/provenance/report-reproduction-gaps.md` for remaining
       source-data blockers.
-- [ ] Decide whether the repo is being published as a fork, a derivative package, or
-      an internal analysis repository.
-- [ ] Update publishing metadata only after that decision is explicit.
+- [ ] Confirm GitHub remotes point to `TedTschopp/data-center-siting-lab` before
+  pushing.
+- [ ] Confirm the package registry publication decision before publishing wheels or
+  source distributions.

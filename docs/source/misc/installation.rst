@@ -7,13 +7,13 @@ Installation
 
     .. code-block:: shell
 
-        git clone git@github.com:NatLabRockies/reVeal.git
+        git clone git@github.com:TedTschopp/data-center-siting-lab.git
 
 2. Move into the local repository
 
     .. code-block:: shell
 
-        cd reVeal
+        cd data-center-siting-lab
 
 
 3. Recommended: Setup virtual environment with `conda`/`mamba`:
@@ -21,11 +21,11 @@ Installation
     .. code-block:: shell
 
         mamba env create -f environment.yml
-        mamba activate reVeal
+        mamba activate data-center-siting-lab
 
     Note: You may choose an alternative virtual environment solution; however, installation of dependencies is not guaranteed to work.
 
-4. Install ``reVeal``:
+4. Install ``data-center-siting-lab``:
     .. code-block:: shell
 
         pip install .

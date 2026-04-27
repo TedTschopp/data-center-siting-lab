@@ -1,5 +1,5 @@
 name: Installation Issue
-description: Report issues installing reVeal on your system
+description: Report issues installing data-center-siting-lab on your system
 
 body:
   - type: checkboxes
@@ -8,7 +8,7 @@ body:
       label: Installation check
       options:
         - label: >
-            I have read the [installation guide](https://natlabrockies.github.io/reVeal/misc/installation.html).
+            I have read the [installation guide](https://tedtschopp.github.io/data-center-siting-lab/misc/installation.html).
           required: true
   - type: input
     id: platform
@@ -23,19 +23,19 @@ body:
     attributes:
       label: Installation Method
       description: >
-        Please provide how you tried to install reVeal from a clean environment.
+        Please provide how you tried to install data-center-siting-lab from a clean environment.
       options:
-        - pip install (from PyPi)
         - pip install . (from source)
+        - pixi install
         - Other
     validations:
       required: true
   - type: input
-    id: reVeal
+    id: data-center-siting-lab
     attributes:
-      label: reVeal Version
+      label: data-center-siting-lab Version
       description: >
-        Please provide the version of reVeal you are trying to install.
+        Please provide the version of data-center-siting-lab you are trying to install.
     validations:
       required: true
   - type: input
@@ -51,6 +51,6 @@ body:
     attributes:
       label: Installation Logs
       description: >
-        If possible, please copy and paste the installation logs when attempting to install reVeal.
+        If possible, please copy and paste the installation logs when attempting to install data-center-siting-lab.
       value: >
         Replace this line with the installation logs

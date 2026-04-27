@@ -6,18 +6,18 @@ requires = [
 build-backend = 'setuptools.build_meta'
 
 [project]
-name = "NLR-reVeal"
+name = "data-center-siting-lab"
 dynamic = ["version"]
-description = "The reV Extension for Analyzing Large Loads."
+description = "A bounded public data center siting and large-load analysis lab built on reVeal."
 readme = "README.rst"
 authors = [
-  {name = "Michael Gleason", email = "mike.gleason@nlr.gov"},
+  {name = "Ted Tschopp"},
 ]
 maintainers = [
-  {name = "Pavlo Pinchuk", email = "ppinchuk@nlr.gov"},
+  {name = "Ted Tschopp"},
 ]
 license = "BSD-3-Clause"
-keywords = ["reVeal", "NLR", "Load Analysis", "Geospatial", "Site-Suitability"]
+keywords = ["data-center-siting-lab", "reVeal", "Data Center Siting", "Load Analysis", "Geospatial", "Site-Suitability"]
 requires-python = ">= 3.12"
 classifiers = [
   "Development Status :: 4 - Beta",
@@ -79,9 +79,9 @@ build = [
 reVeal = "reVeal.cli.cli:main"
 
 [project.urls]
-homepage = "https://github.com/NatLabRockies/reVeal"
-documentation = "https://natlabrockies.github.io/reVeal/"
-repository = "https://github.com/NatLabRockies/reVeal"
+homepage = "https://github.com/TedTschopp/data-center-siting-lab"
+documentation = "https://tedtschopp.github.io/data-center-siting-lab/"
+repository = "https://github.com/TedTschopp/data-center-siting-lab"
 
 
 [tool.setuptools.packages]
@@ -93,7 +93,7 @@ version_file = "reVeal/_version.py"
 
 
 [tool.pixi.workspace]
-name = "reVeal"
+name = "data-center-siting-lab"
 channels = ["conda-forge"]
 platforms = ["osx-arm64", "linux-64", "linux-aarch64", "win-64"]
 
@@ -129,7 +129,7 @@ rasterio = ">=1.4.4,<2"
 tqdm = ">=4.67.1,<5"
 
 [tool.pixi.pypi-dependencies]
-NLR-reVeal = { path = ".", editable = true }
+data-center-siting-lab = { path = ".", editable = true }
 
 [tool.pixi.feature.dev.dependencies]
 ipython = ">=8.29.0,<9"

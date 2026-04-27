@@ -12,9 +12,9 @@ from reVeal._version import __version__
 
 sys.path.insert(0, os.path.abspath("../../"))
 
-project = "reVeal"
-copyright = "2025, Alliance for Energy Innovation, LLC and Root Geospatial LLC"
-author = "NLR: Michael Gleason, Pavlo Pinchuk, Victor Igwe, Travis Williams"
+project = "data-center-siting-lab"
+copyright = "2026, Ted Tschopp; derived from reVeal by Alliance for Energy Innovation, LLC and Root Geospatial LLC"
+author = "Ted Tschopp; upstream reVeal authors: Michael Gleason, Pavlo Pinchuk, Victor Igwe, Travis Williams"
 
 pkg = os.path.dirname(os.path.abspath(os.path.dirname(__file__)))
 pkg = os.path.dirname(pkg)
@@ -70,8 +70,8 @@ html_theme_options = {"navigation_depth": 4, "collapse_navigation": False}
 html_css_file = ["custom.css"]
 html_context = {
     "display_github": True,
-    "github_user": "NatLabRockies",
-    "github_repo": "reVeal",
+    "github_user": "TedTschopp",
+    "github_repo": "data-center-siting-lab",
     "github_version": "main",
     "conf_py_path": "/docs/source/",
     "source_suffix": source_suffix,
@@ -79,24 +79,24 @@ html_context = {
 html_static_path = ["_static"]
 # html_logo = "_static/logo.png"
 
-htmlhelp_basename = "reVealdoc"
+htmlhelp_basename = "data_center_siting_lab_doc"
 
 latex_elements = {}
 
 latex_documents = [
-    (master_doc, "reVeal.tex", "reVeal Documentation", author, "manual"),
+    (master_doc, "data-center-siting-lab.tex", "data-center-siting-lab Documentation", author, "manual"),
 ]
 
-man_pages = [(master_doc, "reVeal", "reVeal Documentation", [author], 1)]
+man_pages = [(master_doc, "data-center-siting-lab", "data-center-siting-lab Documentation", [author], 1)]
 
 texinfo_documents = [
     (
         master_doc,
-        "reVeal",
-        "reVeal Documentation",
+        "data-center-siting-lab",
+        "data-center-siting-lab Documentation",
         author,
-        "reVeal",
-        "reVeal: the reV Extension for Analyzing Large Loads.",
+        "data-center-siting-lab",
+        "data-center-siting-lab: bounded public data center siting workflows built on reVeal.",
         "Miscellaneous",
     ),
 ]

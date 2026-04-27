@@ -1,4 +1,4 @@
-name: reVeal
+name: data-center-siting-lab
 channels:
     - conda-forge
     - nrel

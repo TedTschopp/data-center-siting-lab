@@ -1,26 +1,26 @@
 name: Documentation Improvement
-description: Report wrong, missing, or incomplete reVeal documentation
+description: Report wrong, missing, or incomplete data-center-siting-lab documentation
 type: Task
 labels: [documentation, enhancement]
 
 body:
   - type: checkboxes
     attributes:
-      label: reVeal version checks
+      label: Documentation version checks
       options:
         - label: >
             I have checked that the issue still exists on the latest versions of the docs
-            on `main` [here](https://natlabrockies.github.io/reVeal/)
+            on `main` [here](https://tedtschopp.github.io/data-center-siting-lab/)
           required: true
   - type: textarea
     id: location
     attributes:
       label: Location of the documentation
       description: >
-        Please provide the location of the documentation, e.g. ``reVeal.maps.map_geodataframe_column`` or the
+        Please provide the location of the documentation, e.g. ``docs/source/misc/data_center_report_bundle.rst`` or the
         URL of the documentation, e.g.
-        "https://natlabrockies.github.io/reVeal/_autosummary/reVeal.maps.html#reVeal.maps.map_geodataframe_column"
-      placeholder: https://natlabrockies.github.io/reVeal/_autosummary/reVeal.maps.html#reVeal.maps.map_geodataframe_column
+        "https://tedtschopp.github.io/data-center-siting-lab/misc/data_center_report_bundle.html"
+      placeholder: https://tedtschopp.github.io/data-center-siting-lab/misc/data_center_report_bundle.html
     validations:
       required: true
   - type: textarea

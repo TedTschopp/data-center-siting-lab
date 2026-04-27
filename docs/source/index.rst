@@ -9,16 +9,20 @@
    CLI reference <_cli/cli>
    API reference <_autosummary/reVeal>
 
-reVeal documentation
-********************
+data-center-siting-lab documentation
+************************************
 
-What is reVeal?
-===============
+What is data-center-siting-lab?
+===============================
 
-``reVeal`` (the reV Extension for Analyzing Large Loads) is an open-source geospatial software package for modeling the site-suitability and spatial patterns of deployment of large sources of electricity demand under future scenarios. ``reVeal`` is part of the `reV ecosystem of tools <https://natlabrockies.github.io/reV/#rev-ecosystem>`_.
+``data-center-siting-lab`` is a bounded public data center siting and large-load
+analysis repository built on the upstream ``reVeal`` package from
+``NatLabRockies/reVeal``. It adds public-data staging, proxy workflows,
+report-bundle generation, executive review artifacts, and explicit assumption
+contracts for data center siting analysis.
 
-How does reVeal work?
-=====================
+How does the underlying reVeal model work?
+==========================================
 ``reVeal`` consists of a library of Python classes and functions which are wrapped in a series of CLI commands. These commands can be run individually or as composed pipelines to enable model execution.
 
 ``reVeal`` is typically run on a user-input geospatial (GIS) grid covering the the user's area of interest. The modeling process typically follows the following workflow:
