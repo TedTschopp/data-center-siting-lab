@@ -1,7 +1,7 @@
 blank_issues_enabled: false
 contact_links:
-  - name: Question
-    url: https://github.com/TedTschopp/data-center-siting-lab/discussions
-    about: |
-      Ask questions about data-center-siting-lab and discuss with the maintainers here. If you have a question like "How do I calculate site-suitability scores?", please
-      include a self-contained reproducible example of what you have tried already, if possible.
+- name: Question
+  url: https://github.com/TedTschopp/data-center-siting-lab/discussions
+  about: |
+    Ask questions about data-center-siting-lab and discuss with the maintainers here. If you have a question like "How do I calculate site-suitability scores?", please
+    include a self-contained reproducible example of what you have tried already, if possible.

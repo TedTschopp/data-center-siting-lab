@@ -1,21 +1,21 @@
 name: data-center-siting-lab
 channels:
-    - conda-forge
-    - nrel
+  - conda-forge
+  - nrel
 dependencies:
-    - python=3.12
-    - pandas>=2.3.3,<3
-    - geopandas>=1.1.1,<2
-    - rasterio>=1.4.4,<2
-    - gdal>=3.12.1,<4
-    - pyogrio>=0.12.1,<0.13
-    - pyarrow>=22.0.0,<23
-    - proj-data>=1.24,<2
-    - tqdm>=4.67.1,<5
-    - exactextract>=0.2.2,<1
-    - pydantic>=2.12.5,<3
-    - libpysal>=4.13.0,<5
-    - pip>=25.2
-    - pip:
-        - NLR-GAPs>=0.9.1,<1
-        - NLR-rex>=0.5.0,<1
+  - python=3.12
+  - pandas>=2.3.3,<3
+  - geopandas>=1.1.1,<2
+  - rasterio>=1.4.4,<2
+  - gdal>=3.12.1,<4
+  - pyogrio>=0.12.1,<0.13
+  - pyarrow>=22.0.0,<23
+  - proj-data>=1.24,<2
+  - tqdm>=4.67.1,<5
+  - exactextract>=0.2.2,<1
+  - pydantic>=2.12.5,<3
+  - libpysal>=4.13.0,<5
+  - pip>=25.2
+  - pip:
+      - NLR-GAPs>=0.9.1,<1
+      - NLR-rex>=0.5.0,<1

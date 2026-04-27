@@ -1,41 +1,38 @@
 name: Documentation Improvement
 description: Report wrong, missing, or incomplete data-center-siting-lab documentation
 type: Task
-labels: [documentation, enhancement]
+labels: [ documentation, enhancement ]
 
 body:
-  - type: checkboxes
-    attributes:
-      label: Documentation version checks
-      options:
-        - label: >
-            I have checked that the issue still exists on the latest versions of the docs
-            on `main` [here](https://tedtschopp.github.io/data-center-siting-lab/)
-          required: true
-  - type: textarea
-    id: location
-    attributes:
-      label: Location of the documentation
-      description: >
-        Please provide the location of the documentation, e.g. ``docs/source/misc/data_center_report_bundle.rst`` or the
-        URL of the documentation, e.g.
-        "https://tedtschopp.github.io/data-center-siting-lab/misc/data_center_report_bundle.html"
-      placeholder: https://tedtschopp.github.io/data-center-siting-lab/misc/data_center_report_bundle.html
-    validations:
+- type: checkboxes
+  attributes:
+    label: Documentation version checks
+    options:
+    - label: >
+        I have checked that the issue still exists on the latest versions of the docs on `main` [here](https://tedtschopp.github.io/data-center-siting-lab/)
       required: true
-  - type: textarea
-    id: problem
-    attributes:
-      label: Documentation problem
-      description: >
-        Please provide a description of what documentation you believe needs to be fixed/improved.
-    validations:
-      required: true
-  - type: textarea
-    id: suggested-fix
-    attributes:
-      label: Suggested fix for documentation
-      description: >
-        Please provide a suggested fix for the wrong, missing, or incomplete documentation.
-    validations:
-      required: true
+- type: textarea
+  id: location
+  attributes:
+    label: Location of the documentation
+    description: >
+      Please provide the location of the documentation, e.g. ``docs/source/misc/data_center_report_bundle.rst`` or the URL of the documentation, e.g. "https://tedtschopp.github.io/data-center-siting-lab/misc/data_center_report_bundle.html"
+    placeholder: https://tedtschopp.github.io/data-center-siting-lab/misc/data_center_report_bundle.html
+  validations:
+    required: true
+- type: textarea
+  id: problem
+  attributes:
+    label: Documentation problem
+    description: >
+      Please provide a description of what documentation you believe needs to be fixed/improved.
+  validations:
+    required: true
+- type: textarea
+  id: suggested-fix
+  attributes:
+    label: Suggested fix for documentation
+    description: >
+      Please provide a suggested fix for the wrong, missing, or incomplete documentation.
+  validations:
+    required: true

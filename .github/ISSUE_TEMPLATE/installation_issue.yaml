@@ -2,55 +2,55 @@ name: Installation Issue
 description: Report issues installing data-center-siting-lab on your system
 
 body:
-  - type: checkboxes
-    id: checks
-    attributes:
-      label: Installation check
-      options:
-        - label: >
-            I have read the [installation guide](https://tedtschopp.github.io/data-center-siting-lab/misc/installation.html).
-          required: true
-  - type: input
-    id: platform
-    attributes:
-      label: Platform
-      description: >
-        Please provide the output of ``import platform; print(platform.platform())``
-    validations:
+- type: checkboxes
+  id: checks
+  attributes:
+    label: Installation check
+    options:
+    - label: >
+        I have read the [installation guide](https://tedtschopp.github.io/data-center-siting-lab/misc/installation.html).
       required: true
-  - type: dropdown
-    id: method
-    attributes:
-      label: Installation Method
-      description: >
-        Please provide how you tried to install data-center-siting-lab from a clean environment.
-      options:
-        - pip install . (from source)
-        - pixi install
-        - Other
-    validations:
-      required: true
-  - type: input
-    id: data-center-siting-lab
-    attributes:
-      label: data-center-siting-lab Version
-      description: >
-        Please provide the version of data-center-siting-lab you are trying to install.
-    validations:
-      required: true
-  - type: input
-    id: python
-    attributes:
-      label: Python Version
-      description: >
-        Please provide the installed version of Python.
-    validations:
-      required: true
-  - type: textarea
-    id: logs
-    attributes:
-      label: Installation Logs
-      description: >
-        If possible, please copy and paste the installation logs when attempting to install data-center-siting-lab.
-      value: >
-        Replace this line with the installation logs
+- type: input
+  id: platform
+  attributes:
+    label: Platform
+    description: >
+      Please provide the output of ``import platform; print(platform.platform())``
+  validations:
+    required: true
+- type: dropdown
+  id: method
+  attributes:
+    label: Installation Method
+    description: >
+      Please provide how you tried to install data-center-siting-lab from a clean environment.
+    options:
+    - pip install . (from source)
+    - pixi install
+    - Other
+  validations:
+    required: true
+- type: input
+  id: data-center-siting-lab
+  attributes:
+    label: data-center-siting-lab Version
+    description: >
+      Please provide the version of data-center-siting-lab you are trying to install.
+  validations:
+    required: true
+- type: input
+  id: python
+  attributes:
+    label: Python Version
+    description: >
+      Please provide the installed version of Python.
+  validations:
+    required: true
+- type: textarea
+  id: logs
+  attributes:
+    label: Installation Logs
+    description: >
+      If possible, please copy and paste the installation logs when attempting to install data-center-siting-lab.
+    value: >
+      Replace this line with the installation logs
