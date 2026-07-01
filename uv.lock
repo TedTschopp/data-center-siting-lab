@@ -719,7 +719,7 @@ requires-dist = [
     { name = "build", marker = "extra == 'build'", specifier = ">=1.2.2,<2" },
     { name = "exactextract", specifier = ">=0.3.0,<0.4" },
     { name = "flaky", marker = "extra == 'test'", specifier = ">=3.8.1,<4" },
-    { name = "gdal", specifier = ">=3.10.3,<4" },
+    { name = "gdal", specifier = ">=3.13.1,<4" },
     { name = "geopandas", specifier = ">=1.1.1,<2" },
     { name = "ghp-import", marker = "extra == 'doc'", specifier = ">=2.1.0,<3" },
     { name = "jupyter", marker = "extra == 'dev'", specifier = ">=1.0.0,<1.1" },
@@ -1016,9 +1016,9 @@ wheels = [
 
 [[package]]
 name = "gdal"
-version = "3.12.4"
+version = "3.13.1"
 source = { registry = "https://pypi.org/simple" }
-sdist = { url = "https://files.pythonhosted.org/packages/ba/46/254240e849a086a9e47ce1d32dae65e9781fbd47a96056b7b1655eb219d2/gdal-3.12.4.tar.gz", hash = "sha256:cba3ae61b1acc83aae494f77980c2ec86cefba4d6bfd6cac84a5552efabe90bd", size = 899408, upload-time = "2026-04-24T12:21:49.178Z" }
+sdist = { url = "https://files.pythonhosted.org/packages/92/55/0ae08a59293443bbbb8b692d1f4b6d9ca54562c359a48d0426684ac9ea06/gdal-3.13.1.tar.gz", hash = "sha256:94bb64d729ce73ceb75a314a15cba92696cdd854d99b6bf6b88a7b551227db74", size = 940649, upload-time = "2026-06-05T10:50:14.929Z" }
 
 [[package]]
 name = "geopandas"
