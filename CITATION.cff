@@ -6,6 +6,8 @@ type: software
 authors:
 - family-names: Tschopp
   given-names: Ted
+  affiliation: Southern California Edison
+  orcid: 'https://orcid.org/0009-0004-3373-9546'
 - family-names: Gleason
   given-names: Michael
   affiliation: National Laboratory of the Rockies
