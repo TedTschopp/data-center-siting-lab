@@ -3609,7 +3609,7 @@ def test_main_runs_public_report_bundle_command(tmp_path, monkeypatch, capsys):
     )
 
     assert exit_code == 0
-    assert output_dir.as_posix() in capsys.readouterr().out
+    assert Path(capsys.readouterr().out.strip()) == output_dir
 
 
 def test_build_osm_fiber_line_frame_filters_route_like_features():

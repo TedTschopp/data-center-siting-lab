@@ -106,7 +106,9 @@ jobs:
     - name: Install Package
       shell: bash -l {0}
       run: |
-        python -m pip install .[test]
+        # Stay on the minor versions already tested by Pixi. pytest-cases
+        # needs pytest 9.0, and fileio uses GeoPandas 1.1's Arrow helpers.
+        python -m pip install '.[test]' 'pytest<9.1' 'geopandas<1.2'
 
     - name: Run Pytest
       shell: bash -l {0}
